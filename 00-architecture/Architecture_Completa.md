@@ -4,7 +4,7 @@
 
 Construida sobre VMware Workstation Pro 17. Tres máquinas virtuales conectadas en la misma red interna (192.168.75.x).
 
-![Arquitectura On-Premises](../01-onprem/screenshots/architecture-onprem.png)
+![Infraestructura On-Premises](./screenshots/onprem-infrastructure.png)
 ```
 DC01 · Windows Server 2019 · 192.168.75.4 · 2GB RAM
 ├─ AD DS (daniel.local)
@@ -41,6 +41,8 @@ WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
 ```
 
 ## Infraestructura Azure
+
+![Infraestructura Azure](./screenshots/azure-infrastructure.png)
 ```
 Resource Group: rg-daniellab
 │
@@ -88,45 +90,12 @@ Resource Group: rg-daniellab
 ```
 
 ## Arquitectura de la Aplicación Web (3 Capas)
-```
-Usuario / WS001
-    │
-    │ HTTPS :443
-    ▼
-┌─────────┐     ┌──────────────┐     ┌─────────────────┐
-│   IIS   │────►│  ASP.NET 8   │────►│  SQL Server     │
-│  :443   │     │  Program.cs  │     │  Express        │
-└─────────┘     └──────────────┘     │  └─ DanielDB    │
-  ON-PREM          ON-PREM           │     ├─ Proyectos │
-                                     │     └─ Certs     │
-                                     └─────────────────┘
-                                          ON-PREM
 
-Tras la migración:
-
-Usuario
-    │
-    │ HTTPS
-    ▼
-┌──────────────┐     ┌─────────────────┐
-│ App Service  │────►│ Azure VM B2s    │
-│ ASP.NET Core │     │ SQL Server 2022 │
-└──────────────┘     │ └─ DanielDB     │
-    AZURE             └─────────────────┘
-                           AZURE
-```
+![Arquitectura Web 3 Capas](./screenshots/webapp-3tier.png)
 
 ## Mapa de Migración
 
-| On-Premises | Por qué migrar | Herramienta | Azure | Enfoque |
-|---|---|---|---|---|
-| AD DS | Identidad en nube + SSO | Entra Connect | Entra ID | Sincronización híbrida |
-| DNS | Incluido con Entra | Automático | DNS Privado | Incluido |
-| File Server | Almacenamiento en nube + disponibilidad | AzCopy | Azure Files | Lift & shift |
-| WSUS | Gestión centralizada de updates en nube | Azure Arc | Azure Update Manager | Sustitución |
-| IIS + ASP.NET | PaaS — sin gestión de SO | ZIP Deploy | App Service | Modernización PaaS |
-| SQL Server Express | IaaS — compatibilidad total con SQL | Backup/Restore .bak | Azure VM + SQL Server | Lift & shift |
-| Windows Server Backup | Backup en nube + retención offsite | Agente MARS | Recovery Services Vault | Extensión a nube |
+![Mapa de Migración](./screenshots/migration-map.png)
 
 ## Decisiones de Diseño
 
