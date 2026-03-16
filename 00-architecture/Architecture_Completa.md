@@ -1,4 +1,4 @@
-# Descripción de la Arquitectura
+# Arquitectura Completa
 
 ## Infraestructura On-Premises
 
