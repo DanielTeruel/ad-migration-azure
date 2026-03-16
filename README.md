@@ -4,6 +4,8 @@ End-to-end migration of a Windows Server Active Directory environment to Microso
 
 ## Overview
 
+![AD Migration Lab Overview](./00-architecture/screenshots/overview.png)
+
 In this lab, I designed and built a complete on-premises infrastructure using **VMware Workstation Pro 17**, including a Domain Controller with AD DS, DNS, DHCP, WSUS and GPOs, an application server running IIS, ASP.NET Core and SQL Server, and a Windows 10 client joined to the domain.
 
 Once the on-premises environment was fully operational, I migrated all services to Azure using the appropriate tools and services for each workload, demonstrating both **IaaS and PaaS** migration approaches, hybrid identity with **Entra Connect**, server management with **Azure Arc**, and cloud backup with **Recovery Services Vault**.
