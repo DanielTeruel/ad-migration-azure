@@ -7,7 +7,7 @@ End-to-end migration of a Windows Server Active Directory environment to Microso
 ON-PREM (VMware Workstation Pro 17)
 ─────────────────────────────────────────────────────
   DC01 · Windows Server 2019 · 2GB RAM
-  ├─ AD DS (DANIEL.LOC) · DNS · DHCP · GPO
+  ├─ AD DS (daniel.local) · DNS · DHCP · GPO
   ├─ File Server → E:\SharedFiles\
   └─ WSUS → manages APP01 + WS001
 
@@ -37,7 +37,7 @@ AZURE (rg-daniellab)
 
 | On-Premises | Tool | Azure |
 |---|---|---|
-| AD DS (DANIEL.LOC) | Entra Connect | Entra ID |
+| AD DS (daniel.local) | Entra Connect | Entra ID |
 | DNS | Included | Entra ID Private DNS |
 | File Server | AzCopy | Azure Files |
 | WSUS | Azure Arc | Azure Update Manager |
