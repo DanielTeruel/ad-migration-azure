@@ -4,19 +4,19 @@ End-to-end migration of a Windows Server Active Directory environment to Microso
 
 ## Architecture Overview
 ```
-ON-PREM (Hyper-V / 192.168.75.x)
+ON-PREM (VMware Workstation Pro 17)
 ─────────────────────────────────────────────────────
-  DC01 · Windows Server 2019
+  DC01 · Windows Server 2019 · 2GB RAM
   ├─ AD DS (DANIEL.LOC) · DNS · DHCP · GPO
   ├─ File Server → E:\SharedFiles\
   └─ WSUS → manages APP01 + WS001
 
-  APP01 · Windows Server 2019
+  APP01 · Windows Server 2019 · 2GB RAM
   ├─ IIS (HTTPS:443) + ASP.NET Core 8
   ├─ SQL Server Express → DanielDB
   └─ Windows Server Backup → DC01 File Share
 
-  WS001 · Windows 10/11
+  WS001 · Windows 10 · 2GB RAM
   └─ Domain Joined · GPO-WSUS · Hybrid Joined
 
 AZURE (rg-daniellab)
@@ -63,10 +63,10 @@ AZURE (rg-daniellab)
 
 ## Lab Specs
 
-- **Host:** Hyper-V on Windows 10/11
-- **VMs:** DC01 (3GB RAM), APP01 (4GB RAM), WS001 (2GB RAM)
-- **Azure subscription:** Azure for Students ($100 credits)
-- **Estimated Azure cost:** ~$0.32 for the full lab session
+- **Hypervisor:** VMware Workstation Pro 17
+- **DC01:** Windows Server 2019 · 2GB RAM
+- **APP01:** Windows Server 2019 · 2GB RAM
+- **WS001:** Windows 10 · 2GB RAM
 
 ## Status
 
