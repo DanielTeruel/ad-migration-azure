@@ -108,6 +108,8 @@ Applied to **OU=Workstations**. Configures WS001 to receive updates from WSUS au
 
 ### GPO-WSUS-Servers
 
+![GPO WSUS Servers Linked](./screenshots/dc01-gpo-wsus-servers-linked.png)
+
 Applied to **OU=Servers**. Configures APP01 to receive updates from WSUS with admin-controlled installation — no automatic restarts.
 
 | Setting | Value |
@@ -122,7 +124,6 @@ Servers require controlled maintenance windows — an unplanned restart of APP01
 
 ## File Server
 
-![File Server Shares](./screenshots/dc01-fileserver-shares.png)
 ![Backup Folder](./screenshots/dc01-fileserver-backup-folder.png)
 
 Shared folder **E:\SharedFiles** serves as the backup destination for APP01's Windows Server Backup job.
@@ -138,11 +139,11 @@ E:\SharedFiles\
 
 ## WSUS — Windows Server Update Services
 
-![WSUS Clients](./screenshots/dc01-wsus-clients.png)
 ![WSUS Servers Group](./screenshots/dc01-wsus-servers.png)
 ![WSUS Workstations Group](./screenshots/dc01-wsus-workstations.png)
 ![WSUS Sync](./screenshots/dc01-wsus-sync.png)
 ![WSUS Products](./screenshots/dc01-wsus-products.png)
+![WSUS Classifications](./screenshots/dc01-wsus-clasifications.png)
 
 WSUS running on port **8530**, managing updates for all lab machines separated into dedicated groups:
 
