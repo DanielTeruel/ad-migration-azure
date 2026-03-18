@@ -1,5 +1,10 @@
 ![On-Premises Infrastructure](./banner-onprem.png)
 
+![Status](https://img.shields.io/badge/Status-Complete-green)
+![VMs](https://img.shields.io/badge/VMs-3-blue)
+![Hypervisor](https://img.shields.io/badge/Hypervisor-VMware%20Workstation%20Pro%2017-lightgrey)
+![OS](https://img.shields.io/badge/OS-Windows%20Server%202019-blue)
+
 # 01 — On-Premises Infrastructure
 
 ## Overview
@@ -8,31 +13,13 @@ Complete on-premises infrastructure built on **VMware Workstation Pro 17**, simu
 
 This environment serves as the migration source for the Azure phase of the lab.
 
-## Infrastructure Summary
-```
-ON-PREMISES (192.168.75.x)
-──────────────────────────────────────────────────────────────────
-DC01 · Windows Server 2019 · 192.168.75.4 · 2GB RAM
-├─ AD DS (daniel.local) · DNS · DHCP · GPO
-├─ File Server → E:\SharedFiles\Backups\APP01\
-└─ WSUS (port 8530) → Servers + Workstations groups
-
-APP01 · Windows Server 2019 · 192.168.75.5 · 2GB RAM
-├─ IIS (HTTPS:443) + ASP.NET Core 8
-├─ SQL Server Express → DanielDB
-└─ Windows Server Backup → DC01 File Share (daily 02:00)
-
-WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
-└─ Domain Joined · GPO-WSUS · Acceso IIS + File Share
-```
-
 ## Servers
 
-| Server | OS | IP | Role |
-|---|---|---|---|
-| DC01 | Windows Server 2019 | 192.168.75.4 | Domain Controller |
-| APP01 | Windows Server 2019 | 192.168.75.5 | Application Server |
-| WS001 | Windows 10 | 192.168.75.7 | Client Machine |
+| Server | OS | IP | RAM | Role |
+|---|---|---|---|---|
+| DC01 | Windows Server 2019 | 192.168.75.4 | 2GB | Domain Controller |
+| APP01 | Windows Server 2019 | 192.168.75.5 | 2GB | Application Server |
+| WS001 | Windows 10 | 192.168.75.7 | 2GB | Client Machine |
 
 ## Services Deployed
 
@@ -49,23 +36,26 @@ WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
 | Windows Server Backup | APP01 | Recovery Services Vault |
 
 ## AD Structure
-```
-daniel.local
-└─ DANIEL (root OU — synced to Entra ID)
-    ├─ Departamentos
-    │   ├─ Admin      → user3_admin
-    │   ├─ HR         → user2_hr
-    │   ├─ IT         → user1_it
-    │   └─ General    → user4_general
-    ├─ Grupos
-    │   ├─ Sec_Admins → Contributor (Azure)
-    │   ├─ Sec_HR     → Reader (Azure)
-    │   └─ Sec_IT     → Reader (Azure)
-    ├─ Servers        → APP01 (excluded from sync)
-    ├─ Workstations   → WS001
-    ├─ Admin_NoSync   → privileged accounts (excluded from sync)
-    └─ Service_Accounts (reserved, excluded from sync)
-```
+
+| OU | Contents | Synced to Entra ID |
+|---|---|---|
+| Departamentos/Admin | user3_admin | ❌ (Admin_NoSync) |
+| Departamentos/HR | user2_hr | ✅ |
+| Departamentos/IT | user1_it | ✅ |
+| Departamentos/General | user4_general | ✅ |
+| Grupos | Sec_Admins · Sec_HR · Sec_IT | ✅ |
+| Servers | APP01 | ❌ (computers excluded) |
+| Workstations | WS001 | ❌ (computers excluded) |
+| Admin_NoSync | user3_admin · App01Admin | ❌ (privileged accounts) |
+| Service_Accounts | — | ❌ (reserved) |
+
+## RBAC Mapping (On-Prem → Azure)
+
+| AD Group | Azure Role | Scope |
+|---|---|---|
+| Sec_Admins | Contributor | rg-daniellab |
+| Sec_IT | Reader | rg-daniellab |
+| Sec_HR | Reader | rg-daniellab |
 
 ## Security Design Decisions
 
@@ -73,10 +63,7 @@ daniel.local
 Privileged accounts are isolated from cloud sync following the Tier Model security principle. A cloud compromise cannot be used to attack on-premises privileged accounts.
 
 **Least Privilege — RBAC mapping**
-AD security groups are mapped to Azure RBAC roles following least privilege:
-- Sec_Admins → Contributor on rg-daniellab
-- Sec_IT → Reader on rg-daniellab
-- Sec_HR → Reader on rg-daniellab
+AD security groups are mapped to Azure RBAC roles following least privilege — no user has more permissions than strictly necessary.
 
 **Separate GPOs for Servers and Workstations**
 APP01 (OU=Servers) receives GPO-WSUS-Servers with notify-only update behavior and no auto-restart. WS001 (OU=Workstations) receives GPO-WSUS with automatic install. This prevents unplanned service outages on the application server.
