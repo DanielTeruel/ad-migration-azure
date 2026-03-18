@@ -5,89 +5,30 @@
 Construida sobre VMware Workstation Pro 17. Tres máquinas virtuales conectadas en la misma red interna (192.168.75.x).
 
 ![Infraestructura On-Premises](./screenshots/onprem-infrastructure.png)
-```
-DC01 · Windows Server 2019 · 192.168.75.4 · 2GB RAM
-├─ AD DS (daniel.local)
-├─ DNS
-├─ DHCP
-├─ GPO
-│   ├─ GPO-WSUS → OU=Workstations
-│   └─ Políticas de seguridad
-├─ File Server → E:\SharedFiles\
-│   └─ Backups\APP01\ ← recibe backups de WSB
-└─ WSUS (puerto 8530)
-    ├─ app01.daniel.local ✓
-    └─ ws001.daniel.local ✓
 
-APP01 · Windows Server 2019 · 192.168.75.5 · 2GB RAM
-├─ IIS (HTTPS:443, puerto 80 cerrado)
-├─ ASP.NET Core 8
-├─ SQL Server Express
-│   └─ DanielDB
-│       ├─ Proyectos
-│       └─ Certificaciones
-└─ Windows Server Backup (wbadmin)
-    ├─ C:\inetpub\wwwroot
-    ├─ C:\inetpub\DanielPortfolio
-    ├─ C:\temp\DanielDB.bak
-    ├─ Programado: diario 02:00
-    └─ Destino: \\DC01\SharedFiles\Backups\APP01\
-
-WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
-├─ Unido al dominio (daniel.local)
-├─ Hybrid Joined
-├─ GPO-WSUS aplicada
-└─ Reportando a WSUS
-```
+| Servidor | SO | IP | RAM | Roles |
+|---|---|---|---|---|
+| DC01 | Windows Server 2019 | 192.168.75.4 | 2GB | AD DS · DNS · DHCP · GPO · WSUS · File Server |
+| APP01 | Windows Server 2019 | 192.168.75.5 | 2GB | IIS · ASP.NET Core 8 · SQL Server Express · WSB |
+| WS001 | Windows 10 | 192.168.75.7 | 2GB | Unido al dominio · GPO-WSUS · Cliente |
 
 ## Infraestructura Azure
 
 ![Infraestructura Azure](./screenshots/azure-infrastructure.png)
-```
-Resource Group: rg-daniellab
-│
-├─ Identidad
-│   └─ Entra ID
-│       └─ Sincronización con Entra Connect desde DC01
-│           └─ Usuarios + Grupos de daniel.local
-│
-├─ Red
-│   ├─ VNet: vnet-daniellab (10.0.0.0/16)
-│   └─ Subnet: snet-app (10.0.1.0/24)
-│       └─ NSG-SQL
-│           ├─ RDP 3389 → solo tu IP
-│           └─ SQL 1433 → solo App Service
-│
-├─ Cómputo
-│   └─ VM-SQL01 · B2s · Windows Server 2022
-│       └─ SQL Server Developer 2022
-│           └─ DanielDB (restaurada desde .bak)
-│
-├─ Web
-│   └─ App Service (F1 Free)
-│       └─ ASP.NET Core 8 (migrado desde APP01)
-│           └─ Cadena de conexión → VM-SQL01:1433
-│
-├─ Almacenamiento
-│   └─ Azure Files (Standard LRS)
-│       └─ Migrado desde File Server de DC01
-│
-├─ Backup
-│   └─ Recovery Services Vault (GRS)
-│       └─ Agente MARS en APP01 (on-prem)
-│
-├─ Gestión Híbrida
-│   └─ Azure Arc
-│       ├─ DC01 (servidor Arc-enabled)
-│       └─ APP01 (servidor Arc-enabled)
-│           └─ Azure Update Manager
-│               └─ Sustituye al WSUS on-prem
-│
-└─ Seguridad y Cumplimiento
-    ├─ Defender for Cloud
-    ├─ Azure Policy
-    └─ Exportación de plantilla ARM (IaC)
-```
+
+| Servicio | SKU | Propósito |
+|---|---|---|
+| Entra ID | Free | Sincronización de identidad desde daniel.local via Entra Connect |
+| VNet + NSG | Standard | Red para Azure VM |
+| Azure Arc | Free | Gestión híbrida de DC01 + APP01 |
+| Azure Update Manager | Free | Sustituye WSUS on-prem |
+| App Service | F1 Free | Aloja IIS + ASP.NET migrado |
+| Azure VM B2s + SQL Server | Pay-as-you-go | Aloja SQL Server Express migrado (IaaS) |
+| Azure Files | Standard LRS | Migrado desde File Server de DC01 |
+| Recovery Services Vault | GRS | Backup en nube via Agente MARS |
+| Defender for Cloud | Free | Postura de seguridad y cumplimiento |
+| Azure Policy | Free | Gobernanza cloud (≈ GPO on-prem) |
+| ARM Template | — | Exportación IaC del entorno Azure completo |
 
 ## Arquitectura de la Aplicación Web (3 Capas)
 
@@ -107,3 +48,9 @@ Elegir IaaS para SQL demuestra un escenario realista de lift & shift donde se re
 
 **¿Por qué Azure Arc?**
 Arc permite gestionar los servidores on-premises (DC01, APP01) directamente desde Azure Portal sin necesidad de migrarlos. Es la base para Azure Update Manager, la cobertura de Defender for Cloud en servidores híbridos y la aplicación de Azure Policy tanto en recursos on-prem como en la nube.
+
+**¿Por qué GPOs separadas para Servidores y Puestos de Trabajo?**
+Los servidores requieren ventanas de mantenimiento controladas — un reinicio no planificado de APP01 dejaría fuera de servicio IIS, SQL Server y la aplicación web. Los puestos de trabajo pueden parchearse automáticamente sin impacto en el negocio.
+
+**¿Por qué la OU Admin_NoSync?**
+Las cuentas privilegiadas se excluyen de la sincronización con Entra Connect siguiendo el principio de seguridad del Modelo de Niveles — evitando que un compromiso en la nube se convierta en una brecha on-premises.

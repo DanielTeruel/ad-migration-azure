@@ -1,3 +1,10 @@
+![Infraestructura On-Premises](./banner-onprem.png)
+
+![Estado](https://img.shields.io/badge/Estado-Completo-green)
+![VMs](https://img.shields.io/badge/VMs-3-blue)
+![Hypervisor](https://img.shields.io/badge/Hypervisor-VMware%20Workstation%20Pro%2017-lightgrey)
+![SO](https://img.shields.io/badge/SO-Windows%20Server%202019-blue)
+
 # 01 — Infraestructura On-Premises
 
 ## Descripción General
@@ -6,31 +13,13 @@ Infraestructura on-premises completa construida sobre **VMware Workstation Pro 1
 
 Este entorno sirve como origen de la migración para la fase de Azure del laboratorio.
 
-## Resumen de Infraestructura
-```
-ON-PREMISES (192.168.75.x)
-──────────────────────────────────────────────────────────────────
-DC01 · Windows Server 2019 · 192.168.75.4 · 2GB RAM
-├─ AD DS (daniel.local) · DNS · DHCP · GPO
-├─ File Server → E:\SharedFiles\Backups\APP01\
-└─ WSUS (puerto 8530) → grupos Servers + Workstations
-
-APP01 · Windows Server 2019 · 192.168.75.5 · 2GB RAM
-├─ IIS (HTTPS:443) + ASP.NET Core 8
-├─ SQL Server Express → DanielDB
-└─ Windows Server Backup → DC01 File Share (diario 02:00)
-
-WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
-└─ Unido al dominio · GPO-WSUS · Acceso IIS + File Share
-```
-
 ## Servidores
 
-| Servidor | SO | IP | Rol |
-|---|---|---|---|
-| DC01 | Windows Server 2019 | 192.168.75.4 | Controlador de Dominio |
-| APP01 | Windows Server 2019 | 192.168.75.5 | Servidor de Aplicaciones |
-| WS001 | Windows 10 | 192.168.75.7 | Equipo Cliente |
+| Servidor | SO | IP | RAM | Rol |
+|---|---|---|---|---|
+| DC01 | Windows Server 2019 | 192.168.75.4 | 2GB | Controlador de Dominio |
+| APP01 | Windows Server 2019 | 192.168.75.5 | 2GB | Servidor de Aplicaciones |
+| WS001 | Windows 10 | 192.168.75.7 | 2GB | Equipo Cliente |
 
 ## Servicios Desplegados
 
@@ -47,40 +36,40 @@ WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
 | Windows Server Backup | APP01 | Recovery Services Vault |
 
 ## Estructura de AD
-```
-daniel.local
-└─ DANIEL (OU raíz — sincronizada con Entra ID)
-    ├─ Departamentos
-    │   ├─ Admin      → user3_admin
-    │   ├─ HR         → user2_hr
-    │   ├─ IT         → user1_it
-    │   └─ General    → user4_general
-    ├─ Grupos
-    │   ├─ Sec_Admins → Contributor (Azure)
-    │   ├─ Sec_HR     → Reader (Azure)
-    │   └─ Sec_IT     → Reader (Azure)
-    ├─ Servers        → APP01 (excluida de la sync)
-    ├─ Workstations   → WS001
-    ├─ Admin_NoSync   → cuentas privilegiadas (excluidas de sync)
-    └─ Service_Accounts (reservada, excluida de sync)
-```
+
+| OU | Contenido | Sincronizado con Entra ID |
+|---|---|---|
+| Departamentos/Admin | user3_admin | ❌ (Admin_NoSync) |
+| Departamentos/HR | user2_hr | ✅ |
+| Departamentos/IT | user1_it | ✅ |
+| Departamentos/General | user4_general | ✅ |
+| Grupos | Sec_Admins · Sec_HR · Sec_IT | ✅ |
+| Servers | APP01 | ❌ (equipos excluidos) |
+| Workstations | WS001 | ❌ (equipos excluidos) |
+| Admin_NoSync | user3_admin · App01Admin | ❌ (cuentas privilegiadas) |
+| Service_Accounts | — | ❌ (reservada) |
+
+## Mapeo RBAC (On-Prem → Azure)
+
+| Grupo AD | Rol Azure | Ámbito |
+|---|---|---|
+| Sec_Admins | Contributor | rg-daniellab |
+| Sec_IT | Reader | rg-daniellab |
+| Sec_HR | Reader | rg-daniellab |
 
 ## Decisiones de Seguridad
 
 **Modelo de Niveles — OU Admin_NoSync**
-Las cuentas privilegiadas están aisladas de la sincronización con la nube siguiendo el principio del Modelo de Niveles (Tier Model). Un compromiso en la nube no puede utilizarse para atacar las cuentas privilegiadas on-premises.
+Las cuentas privilegiadas están aisladas de la sincronización con la nube siguiendo el principio del Modelo de Niveles. Un compromiso en la nube no puede utilizarse para atacar las cuentas privilegiadas on-premises.
 
 **Mínimo Privilegio — Mapeo RBAC**
-Los grupos de seguridad de AD se mapean a roles RBAC de Azure siguiendo el principio de mínimo privilegio:
-- Sec_Admins → Contributor en rg-daniellab
-- Sec_IT → Reader en rg-daniellab
-- Sec_HR → Reader en rg-daniellab
+Los grupos de seguridad de AD se mapean a roles RBAC de Azure siguiendo el principio de mínimo privilegio — ningún usuario tiene más permisos de los estrictamente necesarios.
 
 **GPOs separadas para Servidores y Puestos de Trabajo**
 APP01 (OU=Servers) recibe GPO-WSUS-Servers con comportamiento de solo notificación y sin reinicio automático. WS001 (OU=Workstations) recibe GPO-WSUS con instalación automática. Esto evita interrupciones de servicio no planificadas en el servidor de aplicaciones.
 
 **Puerto 80 cerrado en APP01**
-IIS está configurado para servir únicamente sobre HTTPS (puerto 443). El puerto 80 está cerrado para reducir la superficie de ataque — no se acepta tráfico sin cifrar.
+IIS está configurado para servir únicamente sobre HTTPS (puerto 443). El puerto 80 está cerrado para reducir la superficie de ataque.
 
 ## Documentación
 
