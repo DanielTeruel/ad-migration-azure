@@ -1,4 +1,4 @@
-![On-Premises Infrastructure](01-onprem/banner-onprem.png)
+![On-Premises Infrastructure](./banner-onprem.png)
 
 # 01 — On-Premises Infrastructure
 
