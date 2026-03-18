@@ -1,3 +1,5 @@
+![On-Premises Infrastructure](./banner-onprem.png)
+
 # 01 — On-Premises Infrastructure
 
 ## Overview
