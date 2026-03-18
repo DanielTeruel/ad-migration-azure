@@ -132,7 +132,8 @@ E:\SharedFiles\
 └─ Backups\
     └─ APP01\
         └─ WindowsImageBackup\
-            └─ Backup YYYY-MM-DD\ (daily)
+            └─ APP01\
+                └─ Backup YYYY-MM-DD\ (daily)
 ```
 
 **Migration target:** Azure Files (Standard LRS)
