@@ -5,89 +5,30 @@
 Built on VMware Workstation Pro 17. Three virtual machines connected on the same internal network (192.168.75.x).
 
 ![On-Premises Infrastructure](./screenshots/onprem-infrastructure.png)
-```
-DC01 · Windows Server 2019 · 192.168.75.4 · 2GB RAM
-├─ AD DS (daniel.local)
-├─ DNS
-├─ DHCP
-├─ GPO
-│   ├─ GPO-WSUS → OU=Workstations
-│   └─ Security policies
-├─ File Server → E:\SharedFiles\
-│   └─ Backups\APP01\ ← receives WSB backups
-└─ WSUS (port 8530)
-    ├─ app01.daniel.local ✓
-    └─ ws001.daniel.local ✓
 
-APP01 · Windows Server 2019 · 192.168.75.5 · 2GB RAM
-├─ IIS (HTTPS:443, port 80 closed)
-├─ ASP.NET Core 8
-├─ SQL Server Express
-│   └─ DanielDB
-│       ├─ Proyectos
-│       └─ Certificaciones
-└─ Windows Server Backup (wbadmin)
-    ├─ C:\inetpub\wwwroot
-    ├─ C:\inetpub\DanielPortfolio
-    ├─ C:\temp\DanielDB.bak
-    ├─ Schedule: daily 02:00
-    └─ Target: \\DC01\SharedFiles\Backups\APP01\
-
-WS001 · Windows 10 · 192.168.75.7 · 2GB RAM
-├─ Domain Joined (daniel.local)
-├─ Hybrid Joined
-├─ GPO-WSUS applied
-└─ Reporting to WSUS
-```
+| Server | OS | IP | RAM | Roles |
+|---|---|---|---|---|
+| DC01 | Windows Server 2019 | 192.168.75.4 | 2GB | AD DS · DNS · DHCP · GPO · WSUS · File Server |
+| APP01 | Windows Server 2019 | 192.168.75.5 | 2GB | IIS · ASP.NET Core 8 · SQL Server Express · WSB |
+| WS001 | Windows 10 | 192.168.75.7 | 2GB | Domain Joined · GPO-WSUS · Client |
 
 ## Azure Infrastructure
 
 ![Azure Infrastructure](./screenshots/azure-infrastructure.png)
-```
-Resource Group: rg-daniellab
-│
-├─ Identity
-│   └─ Entra ID
-│       └─ Entra Connect sync from DC01
-│           └─ Users + Groups from daniel.local
-│
-├─ Networking
-│   ├─ VNet: vnet-daniellab (10.0.0.0/16)
-│   └─ Subnet: snet-app (10.0.1.0/24)
-│       └─ NSG-SQL
-│           ├─ RDP 3389 → your IP only
-│           └─ SQL 1433 → App Service only
-│
-├─ Compute
-│   └─ VM-SQL01 · B2s · Windows Server 2022
-│       └─ SQL Server Developer 2022
-│           └─ DanielDB (restored from .bak)
-│
-├─ Web
-│   └─ App Service (F1 Free)
-│       └─ ASP.NET Core 8 (migrated from APP01)
-│           └─ Connection string → VM-SQL01:1433
-│
-├─ Storage
-│   └─ Azure Files (Standard LRS)
-│       └─ Migrated from DC01 File Server
-│
-├─ Backup
-│   └─ Recovery Services Vault (GRS)
-│       └─ MARS Agent on APP01 (on-prem)
-│
-├─ Hybrid Management
-│   └─ Azure Arc
-│       ├─ DC01 (Arc-enabled server)
-│       └─ APP01 (Arc-enabled server)
-│           └─ Azure Update Manager
-│               └─ Replaces WSUS on-prem
-│
-└─ Security & Compliance
-    ├─ Defender for Cloud
-    ├─ Azure Policy
-    └─ ARM Template export (IaC)
-```
+
+| Service | SKU | Purpose |
+|---|---|---|
+| Entra ID | Free | Identity sync from daniel.local via Entra Connect |
+| VNet + NSG | Standard | Networking for Azure VM |
+| Azure Arc | Free | Hybrid management of DC01 + APP01 |
+| Azure Update Manager | Free | Replaces WSUS on-prem |
+| App Service | F1 Free | Hosts migrated IIS + ASP.NET web app |
+| Azure VM B2s + SQL Server | Pay-as-you-go | Hosts migrated SQL Server Express (IaaS) |
+| Azure Files | Standard LRS | Migrated from DC01 File Server |
+| Recovery Services Vault | GRS | Cloud backup via MARS Agent |
+| Defender for Cloud | Free | Security posture and compliance |
+| Azure Policy | Free | Cloud governance (≈ GPO on-prem) |
+| ARM Template | — | IaC export of full Azure environment |
 
 ## Web Application Architecture (3-Tier)
 
@@ -107,3 +48,9 @@ Choosing IaaS for SQL demonstrates a realistic lift & shift scenario where full 
 
 **Why Azure Arc?**
 Arc enables managing on-premises servers (DC01, APP01) directly from Azure Portal without migrating them. This is the foundation for Azure Update Manager, Defender for Cloud coverage on hybrid servers, and Azure Policy enforcement across on-prem and cloud resources.
+
+**Why separate GPOs for Servers and Workstations?**
+Servers require controlled maintenance windows — an unplanned restart of APP01 would take down IIS, SQL Server and the web application. Workstations can be patched automatically without business impact.
+
+**Why Admin_NoSync OU?**
+Privileged accounts are excluded from Entra Connect sync following the Tier Model security principle — preventing a cloud compromise from becoming an on-premises breach.
