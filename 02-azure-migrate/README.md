@@ -1,4 +1,4 @@
-![Azure Migrate](./banner-migrate.png)
+![Azure Migrate](./screenshots/banner-migrate.png)
 ![Status](https://img.shields.io/badge/Status-Complete-green)
 ![Servers](https://img.shields.io/badge/Servers%20Onboarded-2-blue)
 ![Arc](https://img.shields.io/badge/Azure%20Arc-Enabled-0078D4)
