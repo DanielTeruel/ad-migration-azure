@@ -1,4 +1,4 @@
-![Azure Infrastructure](./banner-azure.png)
+![Azure Infrastructure](./screenshots/banner-azure.png)
 ![Status](https://img.shields.io/badge/Status-Complete-green)
 ![Region](https://img.shields.io/badge/Region-francecentral-0078D4)
 ![Resources](https://img.shields.io/badge/Resources-20+-blue)
