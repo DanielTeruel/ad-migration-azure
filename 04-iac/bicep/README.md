@@ -89,10 +89,22 @@ The generated `template.bicep` contains all resource definitions from the origin
 ![First Deploy](./screenshots/04_bicep_first_deploy-ok-but-no-optimal.png)
 ![First Deploy Portal](./screenshots/04_bicep_first_deploy-portal.png)
 ```bash
-az deployment group create \
-  --resource-group rg-daniellab-v3 \
-  --template-file main.bicep \
-  --parameters adminPassword="Admin@Lab2603!"
+$resourceGroupName = "rg-daniellab-v3"
+$location = "francecentral"
+$templatePath = "C:\Users\estudio\Desktop\json\final\bicep\template.bicep"
+$suffix = (Get-Date).ToString("yyMMddHH") # Genera un sufijo basado en la hora
+
+Write-Host "Preparando el Grupo de Recursos..." -ForegroundColor Cyan
+New-AzResourceGroup -Name $resourceGroupName -Location $location -Tag @{"Environment"="Lab"; "Proyecto"="Fase10"} -Force
+
+$adminPassword = Read-Host "Introduce la contraseña para la VM" -AsSecureString
+
+New-AzResourceGroupDeployment `
+  -ResourceGroupName $resourceGroupName `
+  -TemplateFile $templatePath `
+  -adminPassword $adminPassword `
+  -resourceNameSuffix $suffix `
+  -Verbose
 ```
 
 First deployment completed successfully. Portal confirms all resources created. Warnings about unused parameters were present in the output but did not affect the deployment result.
