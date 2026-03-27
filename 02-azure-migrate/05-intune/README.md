@@ -153,7 +153,7 @@ Microsoft 365 Apps (Word, Excel, PowerPoint, Teams) deployed to WS001 via Intune
 ![M365 Config 4](./screenshots/intune-m365-apps-config4.png)
 ![M365 Config 5](./screenshots/intune-m365-apps-config5.png)
 ![M365 Config Final](./screenshots/intune-m365-apps-configfinal.png)
-![M365 Installing](./screenshots/intune-m365-apps-task manager installing.png)
+![M365 Installing](./screenshots/intune-m365-apps-task-manager-installing.png)
 
 | App | Deployed via | Status |
 |---|---|---|
