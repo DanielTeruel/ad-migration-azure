@@ -1,6 +1,6 @@
 # 🔍 Troubleshooting & Lessons Learned
 
-This repository serves as a technical log and Knowledge Base (KB) of the challenges encountered during the **On-Premise to Azure** migration. It documents the resolution of critical errors across Identity, Databases, App Services, and Infrastructure as Code (IaC).
+This documentation serves as a technical log and Knowledge Base (KB) of the challenges encountered during the **On-Premise to Azure** migration. It documents the resolution of critical errors across Identity, Databases, App Services, and Infrastructure as Code (IaC).
 
 ## 🛠️ Methodology: Root Cause Analysis (RCA)
 
@@ -48,6 +48,3 @@ Each entry in this repository follows a structured problem-solving framework:
 2.  **Explicit over Implicit (Networking):** App Service to SQL VM connectivity frequently fails when relying on default drivers. Explicitly defining protocols (`tcp:`) and wrapping passwords with special characters (e.g., `!!`) in single quotes in Key Vault are "small" details that prevent hours of debugging.
 3.  **Stateful Resource Lifecycle:** Resources like Key Vault and Backup Policies have a "life after death" (Soft-delete/Auto-generated defaults). IaC logic must account for purging or importing these existing entities to avoid `ConflictError` during redeployments.
 4.  **API Resilience:** Never trust "Export Template" API versions blindly. Always validate against the [Azure Resource Reference](https://learn.microsoft.com/en-us/azure/templates/) to ensure compatibility with the target region (e.g., `francecentral`).
-
----
-> *Note: This log is a living document used to build a robust Internal Knowledge Base (IKB) for Cloud Operations and DevOps teams.*
