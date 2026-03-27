@@ -1,121 +1,187 @@
-# 05 – Intune (Modern Device Management)
+# 05-intune — Modern Device Management (MDM)
 
-## Objetivo
+## Overview
 
-Enrollar WS001 en Microsoft Intune y aplicar políticas de gestión moderna como
-sustitución parcial de GPOs on-prem, completando así la migración de WS001 a
-gestión cloud.
+**WS001** is already Hybrid Azure AD Joined to both `daniel.local` and Entra ID. This phase adds the **MDM layer** on top of the existing join — enrolling WS001 into Microsoft Intune without breaking the on-premises domain membership.
 
----
+Once enrolled, Intune replaces GPO-based device configuration for cloud-managed policies: compliance rules, security baselines, and application deployment.
 
-## Contexto
+## Machine
 
-WS001 ya tenía Hybrid Azure AD Join completado en la fase anterior (03-hybrid-join).
-Esta fase añade la capa MDM (Mobile Device Management) sobre el dispositivo ya unido,
-sin romper el dominio on-prem existente.
+| Machine | OS | IP | Domain | MDM Status |
+|---|---|---|---|---|
+| WS001 | Windows 10 | 192.168.75.7 | daniel.local | Intune Enrolled ✅ |
 
----
-
-## Limitaciones encontradas
-
-| Limitación | Causa | Solución aplicada |
-|---|---|---|
-| Auto-enrollment MDM bloqueado | Requiere Entra ID P1 (no incluido en Azure for Students) | Enrollment manual via Company Portal |
-| Configuration Profile - Wallpaper bugueado | Bug conocido en el portal de Intune | Sustituido por Interactive Logon Message |
-
----
-
-## Pasos realizados
-
-### 1. Enrollment MDM via Company Portal
-
-WS001 ya estaba Hybrid Joined. El auto-enrollment MDM requiere licencia Entra ID P1,
-no disponible en Azure for Students. Se optó por enrollment manual:
-
-1. Instalar **Company Portal** desde Microsoft Store en WS001
-2. Abrir Company Portal → iniciar sesión con cuenta Entra ID
-3. Seleccionar **"Este dispositivo no está configurado para uso corporativo"**
-4. Completar el flujo de enrollment
-
-**Resultado:** WS001 aparece en Intune con estado enrolled y gestionado por MDM.
+## How Intune Enrollment Works
 ```
-Obtener acceso a trabajo o escuela:
-├─ Conectado a DanielLabTenant MDM  ✅
-└─ Conectado al dominio de AD DANIEL ✅
+WS001 (Windows 10)
+    │
+    ├─ Domain joined ──────────────► AD DS on DC01 (daniel.local)
+    │                                      │
+    │                                      │ Entra Connect sync
+    │                                      ▼
+    ├─ Hybrid Azure AD joined ────► Entra ID (cloud)
+    │                                      │
+    │                                      │ MDM enrollment
+    │                                      ▼
+    └─ MDM enrolled ───────────────► Microsoft Intune
+                                           │
+                                           ├─ Compliance policies
+                                           ├─ Configuration profiles
+                                           └─ App deployment
 ```
 
----
+The device maintains both identities simultaneously — on-prem GPOs still apply via AD DS, while Intune policies layer on top through the MDM channel.
 
-### 2. Compliance Policy
+## Prerequisites
 
-**Nombre:** `compliance-ws001-daniellab`
-**Plataforma:** Windows 10 and later
-
-Reglas configuradas:
-
-| Regla | Valor |
+| Requirement | Status |
 |---|---|
-| Firewall | Requerido |
-| Antivirus | Requerido |
-| Versión mínima del SO | 10.0.19041 |
+| WS001 Hybrid Azure AD Joined | ✅ (02-azure-migrate/03-hybrid-join) |
+| Intune license assigned to admin user | ✅ |
+| Company Portal installed on WS001 | ✅ |
+| WS001 reachable and logged in | ✅ |
 
-**Assignments:** asignada al grupo que contiene WS001
-**Resultado:** WS001 → estado **Compliant** 🟢
+## Limitations
+
+| Limitation | Root Cause | Workaround Applied |
+|---|---|---|
+| Auto-enrollment blocked | Requires Entra ID P1 — not included in Azure for Students | Manual enrollment via Company Portal |
+| Wallpaper Configuration Profile bugged | Known portal issue at time of lab | Replaced with Interactive Logon Message policy |
+
+Auto-enrollment via MDM scope in Entra ID (`Mobility → Microsoft Intune`) requires an **Entra ID P1** license. In a production environment with the appropriate licensing, WS001 would enroll automatically on domain logon with no user interaction required.
 
 ---
 
-### 3. Configuration Profile – Interactive Logon Message
+## Step 1 — MDM Enrollment via Company Portal
 
-**Nombre:** `cfg-interactive-logon-daniellab`
-**Tipo:** Settings Catalog
-**Plataforma:** Windows 10 and later
+Since auto-enrollment requires Entra ID P1, enrollment was performed manually through the **Company Portal** application installed on WS001.
 
-Política aplicada como sustitución de GPO on-prem. Muestra un aviso legal antes
-de que el usuario inicie sesión en WS001.
+![Company Portal Inicio](./screenshots/01_company_portal_inicio.png)
 
-| Setting | Valor |
+Company Portal opens and detects the tenant `DANIELLABTENANT`. The device is not yet configured for corporate management.
+
+![Company Portal MDM Enrolled](./screenshots/03_company_portal_mdm_enrolled.png)
+
+After completing the enrollment flow, **Settings → Accounts → Access work or school** shows two simultaneous connections:
+```
+Access work or school:
+├─ Connected to DanielLabTenant MDM   (Intune)     ✅
+└─ Connected to AD DANIEL domain      (on-prem)    ✅
+```
+
+Both connections coexist — the domain join is fully preserved.
+
+![Intune Devices WS001](./screenshots/05_intune_devices_ws001_enrolled.png)
+
+WS001 appears in **Intune → Devices → All devices**, confirming successful enrollment.
+
+---
+
+## Step 2 — Compliance Policy
+
+A compliance policy defines the minimum security requirements WS001 must meet to be considered trusted by the organization. Non-compliant devices can be blocked from accessing corporate resources via Conditional Access.
+
+**Policy name:** `compliance-ws001-daniellab`  
+**Platform:** Windows 10 and later
+
+### Rules Configured
+
+| Rule | Value |
+|---|---|
+| Firewall | Required |
+| Antivirus | Required |
+| Minimum OS version | 10.0.19041 |
+
+![Compliance Policy Config](./screenshots/06_intune_compliance_policy_config.png)
+![Compliance Policy Config 2](./screenshots/06_intune_compliance_policy_config2.png)
+![Compliance Policy Config 0](./screenshots/06_intune_compliance_policy_config0.png)
+
+### Assignment
+
+![Compliance Policy Assignment](./screenshots/07_intune_compliance_policy_assignment.png)
+![Compliance Policy Assignment Portal](./screenshots/07_intune_compliance_policy_assignment_show_portal.png)
+![Compliance Policy Confirmation](./screenshots/07_intune_compliance_policy_confirmation.png)
+
+The policy is assigned to the group containing WS001. After Intune evaluates the device:
+
+![Device Compliant](./screenshots/10_intune_device_ws001_compliant.png)
+
+| Check | Result |
+|---|---|
+| Firewall active | ✅ |
+| Antivirus active | ✅ |
+| OS version ≥ 10.0.19041 | ✅ |
+| **Overall compliance state** | **Compliant 🟢** |
+
+---
+
+## Step 3 — Configuration Profile (Interactive Logon Message)
+
+Configuration profiles push settings directly to managed devices, replacing the equivalent on-prem GPO. This profile configures a **legal notice** displayed to users before login — a direct cloud equivalent of the on-prem GPO setting `Interactive logon: Message text for users attempting to log on`.
+
+**Profile name:** `cfg-interactive-logon-daniellab`  
+**Type:** Settings Catalog  
+**Platform:** Windows 10 and later
+
+### Settings Applied
+
+| Setting | Value |
 |---|---|
 | Interactive Logon Message Title | Aviso Legal – DanielLabTenant |
 | Interactive Logon Message Text | Este equipo es propiedad de la organización... |
 
-**Assignments:** asignada al mismo grupo que la Compliance Policy
-**Resultado:** Mensaje visible en WS001 antes del login ✅
+![Config Profile Interactive Logon](./screenshots/08_intune_config_policy_interactive_logon.png)
+![Config Profile All Devices](./screenshots/08_intune_config_policy_interactive_logon_all_devices.png)
+![Config Profile Final](./screenshots/08_intune_config_policy_interactive_logon_final.png)
+
+### Verification on WS001
+
+![WS001 Legal Notice](./screenshots/ws001_intune_legal_notice_check.png)
+
+The message appears on WS001 at the login screen, confirming the profile was received and applied by the Intune MDM agent.
 
 ---
 
-## Verificación final
+## Step 4 — Microsoft 365 Apps Deployment
 
-| Check | Resultado |
-|---|---|
-| WS001 visible en Intune → Devices | ✅ |
-| Estado Compliance | Compliant 🟢 |
-| Interactive Logon Message aplicado | ✅ |
-| Hybrid Join mantenido (no roto) | ✅ |
+Microsoft 365 Apps (Word, Excel, PowerPoint, Teams) deployed to WS001 via Intune app deployment — no manual installation or SCCM required.
+
+![M365 Config 1](./screenshots/intune_m365_apps_config1.png)
+![M365 Config 2](./screenshots/intune_m365_apps_config2.png)
+![M365 Config 3](./screenshots/intune_m365_apps_config3.png)
+![M365 Config 4](./screenshots/intune_m365_apps_config4.png)
+![M365 Config 5](./screenshots/intune_m365_apps_config5.png)
+![M365 Config Final](./screenshots/intune_m365_apps_configfinal.png)
+![M365 Installing](./screenshots/intune_m365_apps_task_manager_installing.png)
+
+| App | Deployed via | Status |
+|---|---|---|
+| Microsoft Word | Intune App Deployment | ✅ |
+| Microsoft Excel | Intune App Deployment | ✅ |
+| Microsoft PowerPoint | Intune App Deployment | ✅ |
+| Microsoft Teams | Intune App Deployment | ✅ |
 
 ---
 
-## Screenshots
+## Final Verification
 
-| Archivo | Descripción |
+| Check | Result |
 |---|---|
-| `01_company_portal_inicio.png` | Company Portal abierto, dispositivo no configurado |
-| `03_company_portal_mdm_enrolled.png` | Compliance Policy – reglas configuradas |
-| `05_intune_devices_ws001_enrolled.png` | WS001 visible en Intune Devices |
-| `06_intune_compliance_policy_config.png` | Compliance Policy – reglas configuradas |
-| `06_intune_compliance_policy_config2.png` | Compliance Policy – configuración detallada |
-| `06_intune_compliance_policy_config0.png` | Compliance Policy – vista general |
-| `07_intune_compliance_policy_assignment.png` | Compliance Policy – assignments |
-| `07_intune_compliance_policy_confirmation.png` | Compliance Policy – confirmación creación |
-| `07_intune_compliance_policy_assignment_show_portal.png` | Compliance Policy en portal |
-| `10_intune_device_ws001_compliant.png` | WS001 con estado Compliant 🟢 |
-| `08_intune_config_policy_interactive_logon.png` | Config Profile – Interactive Logon |
-| `08_intune_config_policy_interactive_logon_all_devices.png` | Config Profile – assignments |
-| `08_intune_config_policy_interactive_logon_final.png` | Config Profile – confirmación final |
-| `ws001_intune_legal_notice_check.png` | WS001 mostrando el aviso legal antes del login |
-| `intune_m365_apps_config1.png` | M365 Apps – configuración paso 1 |
-| `intune_m365_apps_config2.png` | M365 Apps – configuración paso 2 |
-| `intune_m365_apps_config3.png` | M365 Apps – configuración paso 3 |
-| `intune_m365_apps_config4.png` | M365 Apps – configuración paso 4 |
-| `intune_m365_apps_config5.png` | M365 Apps – configuración paso 5 |
-| `intune_m365_apps_configfinal.png` | M365 Apps – configuración final |
-| `intune_m365_apps_task_manager_installing.png` | M365 Apps instalándose en WS001 |
+| WS001 visible in Intune → Devices | ✅ |
+| MDM + Domain join coexisting | ✅ |
+| Compliance state | Compliant 🟢 |
+| Interactive Logon Message applied | ✅ |
+| M365 Apps deployed | ✅ |
+| On-prem GPOs still applying | ✅ |
+
+## What Intune Enrollment Enables
+
+| Capability | Requires Intune Enrollment |
+|---|---|
+| Cloud-based compliance evaluation | ✅ |
+| Configuration profiles as GPO replacement | ✅ |
+| App deployment without SCCM | ✅ |
+| Remote device actions (wipe, retire, sync) | ✅ |
+| Integration with Conditional Access | ✅ |
+| Unified device management across on-prem and cloud | ✅ |
