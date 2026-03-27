@@ -113,11 +113,13 @@ First deployment completed successfully. Portal confirms all resources created. 
 
 ## Step 5 — Final Deployment (Clean)
 
-![Final Deploy](./screenshots/04_bicep-final-deploy.png)
+
 ![Final Deploy 1](./screenshots/04_bicep_final%20deploy1.png)
 ![Final Deploy 2](./screenshots/04_bicep_final%20deploy2.png)
 
 Final deployment confirmed with all resources provisioned correctly and the infrastructure matching the ARM and Terraform deployments from previous phases.
+
+![Final Deploy](./screenshots/04_bicep-final-deploy.png)
 
 ---
 
