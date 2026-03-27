@@ -131,13 +131,13 @@ Configuration profiles push settings directly to managed devices, replacing the 
 | Interactive Logon Message Title | Aviso Legal – DanielLabTenant |
 | Interactive Logon Message Text | Este equipo es propiedad de la organización... |
 
-![Config Profile Interactive Logon](./screenshots/08_intune_config_policy_interactive_logon.png)
-![Config Profile All Devices](./screenshots/08_intune_config_policy_interactive_logon_all_devices.png)
-![Config Profile Final](./screenshots/08_intune_config_policy_interactive_logon_final.png)
+![Config Profile Interactive Logon](./screenshots/08_intune_config_policy interactive logon.png)
+![Config Profile All Devices](./screenshots/08_intune_config_policy interactive logon all devicves.png)
+![Config Profile Final](./screenshots/08_intune_config_policy interactive logon final.png)
 
 ### Verification on WS001
 
-![WS001 Legal Notice](./screenshots/ws001_intune_legal_notice_check.png)
+![WS001 Legal Notice](./screenshots/ws001-intune-legal-notice-check.png)
 
 The message appears on WS001 at the login screen, confirming the profile was received and applied by the Intune MDM agent.
 
@@ -147,13 +147,13 @@ The message appears on WS001 at the login screen, confirming the profile was rec
 
 Microsoft 365 Apps (Word, Excel, PowerPoint, Teams) deployed to WS001 via Intune app deployment — no manual installation or SCCM required.
 
-![M365 Config 1](./screenshots/intune_m365_apps_config1.png)
-![M365 Config 2](./screenshots/intune_m365_apps_config2.png)
-![M365 Config 3](./screenshots/intune_m365_apps_config3.png)
-![M365 Config 4](./screenshots/intune_m365_apps_config4.png)
-![M365 Config 5](./screenshots/intune_m365_apps_config5.png)
-![M365 Config Final](./screenshots/intune_m365_apps_configfinal.png)
-![M365 Installing](./screenshots/intune_m365_apps_task_manager_installing.png)
+![M365 Config 1](./screenshots/intune-m365-apps-config1.png)
+![M365 Config 2](./screenshots/intune-m365-apps-config2.png)
+![M365 Config 3](./screenshots/intune-m365-apps-config3.png)
+![M365 Config 4](./screenshots/intune-m365-apps-config4.png)
+![M365 Config 5](./screenshots/intune-m365-apps-config5.png)
+![M365 Config Final](./screenshots/intune-m365-apps-configfinal.png)
+![M365 Installing](./screenshots/intune-m365-apps-task manager installing.png)
 
 | App | Deployed via | Status |
 |---|---|---|
