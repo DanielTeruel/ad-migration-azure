@@ -113,6 +113,20 @@ First deployment completed successfully. Portal confirms all resources created. 
 
 ## Step 5 — Final Deployment (Clean)
 
+```
+$location = "francecentral"
+$templatePath = "C:\Users\estudio\Desktop\json\final\bicep\finalbicep\files\main.bicep"
+$suffix = (Get-Date).ToString("yyMMddHH")
+
+$adminPassword = Read-Host "Introduce la contraseña para la VM" -AsSecureString
+
+New-AzSubscriptionDeployment `
+  -Location $location `
+  -TemplateFile $templatePath `
+  -adminPassword $adminPassword `
+  -resourceNameSuffix $suffix `
+  -Verbose
+```
 
 ![Final Deploy 1](./screenshots/04_bicep_final%20deploy1.png)
 ![Final Deploy 2](./screenshots/04_bicep_final%20deploy2.png)
