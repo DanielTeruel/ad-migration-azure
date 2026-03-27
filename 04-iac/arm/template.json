@@ -1,0 +1,417 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminPassword": {
+      "type": "secureString",
+      "metadata": { "description": "Contraseña administrador" }
+    },
+    "resourceNameSuffix": {
+      "type": "string",
+      "defaultValue": "[utcNow('yyMMddHHmm')]"
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D2s_v3"
+    },
+    "appServicePlanSku": {
+      "type": "string",
+      "defaultValue": "B1"
+    },
+    "machines_APP01_name":                                         { "type": "string", "defaultValue": "APP01" },
+    "machines_DC01_name":                                          { "type": "string", "defaultValue": "DC01" },
+    "networkInterfaces_vm_sql01VMNic_name":                        { "type": "string", "defaultValue": "vm-sql01VMNic" },
+    "networkSecurityGroups_nsg_sql_name":                          { "type": "string", "defaultValue": "nsg-sql" },
+    "serverfarms_asp_daniellab_name":                              { "type": "string", "defaultValue": "asp-daniellab" },
+    "sites_app_daniellab_name":                                    { "type": "string", "defaultValue": "app-daniellab" },
+    "actionGroups_Application_Insights_Smart_Detection_name":      { "type": "String", "defaultValue": "Application Insights Smart Detection" },
+    "bastionHosts_bastion_daniellab_name":                         { "type": "String", "defaultValue": "bastion-daniellab" },
+    "components_ai_daniellab_name":                                { "type": "String", "defaultValue": "ai-daniellab" },
+    "storageAccounts_stdaniellabbackup_name":                      { "type": "String", "defaultValue": "stdaniellabbackup" },
+    "storageAccounts_stfilesdaniellab_name":                       { "type": "String", "defaultValue": "stfilesdaniellab" },
+    "vaults_kv_daniellab_name":                                    { "type": "String", "defaultValue": "kv-daniellab" },
+    "vaults_rsv_daniellab_name":                                   { "type": "String", "defaultValue": "rsv-daniellab" },
+    "virtualMachines_vm_sql01_name":                               { "type": "String", "defaultValue": "vm-sql01" },
+    "virtualNetworks_vnet_daniellab_name":                         { "type": "String", "defaultValue": "vnet-daniellab" },
+    "workspaces_law_daniellab_name":                               { "type": "String", "defaultValue": "law-daniellab" },
+    "sqlServerVersion":                                            { "type": "String", "defaultValue": "SQL Server 2019" }
+  },
+  "variables": {
+    "uniqueNameSuffix": "[take(parameters('resourceNameSuffix'), 4)]",
+    "kvName":           "[concat(parameters('vaults_kv_daniellab_name'), '-', variables('uniqueNameSuffix'))]",
+    "storageBackupName":"[concat('stbkp',   variables('uniqueNameSuffix'), take(uniqueString(resourceGroup().id), 5))]",
+    "storageFilesName": "[concat('stfiles', variables('uniqueNameSuffix'), take(uniqueString(resourceGroup().id), 4))]",
+    "appServiceName":   "[concat(parameters('sites_app_daniellab_name'), '-', variables('uniqueNameSuffix'))]",
+    "vnetName":         "[concat(parameters('virtualNetworks_vnet_daniellab_name'), '-', variables('uniqueNameSuffix'))]",
+    "location":         "[resourceGroup().location]",
+    "tenantId":         "[subscription().tenantId]"
+  },
+  "resources": [
+
+    {
+      "comments": "=== ACTION GROUP (Smart Detection + CPU alert target) ===",
+      "type": "microsoft.insights/actionGroups",
+      "apiVersion": "2023-01-01",
+      "name": "[parameters('actionGroups_Application_Insights_Smart_Detection_name')]",
+      "location": "Global",
+      "properties": {
+        "groupShortName": "SmartDetect",
+        "enabled": true,
+        "emailReceivers":   [],
+        "smsReceivers":     [],
+        "webhookReceivers": [],
+        "armRoleReceivers": []
+      }
+    },
+
+    {
+      "comments": "=== KEY VAULT ===",
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[variables('kvName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "sku": { "family": "A", "name": "standard" },
+        "tenantId": "[variables('tenantId')]",
+        "enableRbacAuthorization": true,
+        "accessPolicies": []
+      }
+    },
+
+    {
+      "comments": "=== NSG para subnet SQL ===",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('networkSecurityGroups_nsg_sql_name')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "securityRules": []
+      }
+    },
+
+    {
+      "comments": "=== VNET con snet-default + AzureBastionSubnet (Developer no la usa, se mantiene por compatibilidad) ===",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('vnetName')]",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_nsg_sql_name'))]"
+      ],
+      "properties": {
+        "addressSpace": { "addressPrefixes": [ "10.0.0.0/16" ] },
+        "subnets": [
+          {
+            "name": "snet-default",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_nsg_sql_name'))]"
+              }
+            }
+          },
+          {
+            "name": "AzureBastionSubnet",
+            "properties": {
+              "addressPrefix": "10.0.2.0/27"
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "comments": "=== NIC para vm-sql01 ===",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('networkInterfaces_vm_sql01VMNic_name')]",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAddress": "10.0.1.10",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '/subnets/snet-default')]"
+              },
+              "primary": true
+            }
+          }
+        ],
+        "enableIPForwarding": false,
+        "enableAcceleratedNetworking": false
+      }
+    },
+
+    {
+      "comments": "=== AZURE BASTION — Developer tier (sin IP pública, sin subnet dedicada obligatoria) ===",
+      "type": "Microsoft.Network/bastionHosts",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('bastionHosts_bastion_daniellab_name')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Developer"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ],
+      "properties": {
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+        }
+      }
+    },
+
+    {
+      "comments": "=== STORAGE — Backup ===",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('storageBackupName')]",
+      "location": "[variables('location')]",
+      "sku": { "name": "Standard_LRS" },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false
+      }
+    },
+
+    {
+      "comments": "=== STORAGE — Files ===",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('storageFilesName')]",
+      "location": "[variables('location')]",
+      "sku": { "name": "Standard_LRS" },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false
+      }
+    },
+
+    {
+      "comments": "=== LOG ANALYTICS WORKSPACE ===",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[parameters('workspaces_law_daniellab_name')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "sku": { "name": "PerGB2018" },
+        "retentionInDays": 30,
+        "features": { "enableLogAccessUsingOnlyResourcePermissions": true }
+      }
+    },
+
+    {
+      "comments": "=== APPLICATION INSIGHTS ===",
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('components_ai_daniellab_name')]",
+      "location": "[variables('location')]",
+      "kind": "web",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaces_law_daniellab_name'))]"
+      ],
+      "properties": {
+        "Application_Type": "web",
+        "Flow_Type": "Redfield",
+        "Request_Source": "IbizaAIExtension",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaces_law_daniellab_name'))]",
+        "IngestionMode": "LogAnalytics",
+        "publicNetworkAccessForIngestion": "Enabled",
+        "publicNetworkAccessForQuery": "Enabled"
+      }
+    },
+
+    {
+      "comments": "=== FAILURE ANOMALIES — Smart Detector sobre Application Insights ===",
+      "type": "microsoft.alertsmanagement/smartdetectoralertrules",
+      "apiVersion": "2021-04-01",
+      "name": "[concat('failure-anomalies-', parameters('components_ai_daniellab_name'))]",
+      "location": "global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', parameters('components_ai_daniellab_name'))]",
+        "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Application_Insights_Smart_Detection_name'))]"
+      ],
+      "properties": {
+        "description": "Failure Anomalies notifica cuando la tasa de errores de la app aumenta de forma anómala",
+        "state": "Enabled",
+        "severity": "Sev3",
+        "frequency": "PT1M",
+        "detector": {
+          "id": "FailureAnomaliesDetector"
+        },
+        "scope": [
+          "[resourceId('Microsoft.Insights/components', parameters('components_ai_daniellab_name'))]"
+        ],
+        "actionGroups": {
+          "groupIds": [
+            "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Application_Insights_Smart_Detection_name'))]"
+          ]
+        }
+      }
+    },
+
+    {
+      "comments": "=== APP SERVICE PLAN — Linux B1 ===",
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('serverfarms_asp_daniellab_name')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "[parameters('appServicePlanSku')]",
+        "tier": "Basic",
+        "size": "[parameters('appServicePlanSku')]",
+        "family": "B",
+        "capacity": 1
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true,
+        "isSpot": false,
+        "zoneRedundant": false
+      }
+    },
+
+    {
+      "comments": "=== RECOVERY SERVICES VAULT ===",
+      "type": "Microsoft.RecoveryServices/vaults",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('vaults_rsv_daniellab_name')]",
+      "location": "[variables('location')]",
+      "sku": { "name": "RS0", "tier": "Standard" },
+      "properties": {
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+
+    {
+      "comments": "=== VM SQL01 ===",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01",
+      "name": "[parameters('virtualMachines_vm_sql01_name')]",
+      "location": "[variables('location')]",
+      "identity": { "type": "SystemAssigned" },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_vm_sql01VMNic_name'))]"
+      ],
+      "properties": {
+        "hardwareProfile": { "vmSize": "[parameters('vmSize')]" },
+        "osProfile": {
+          "computerName": "[parameters('virtualMachines_vm_sql01_name')]",
+          "adminUsername": "sqladmin",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "enableAutomaticUpdates": true,
+            "provisionVMAgent": true,
+            "patchSettings": {
+              "patchMode": "AutomaticByOS",
+              "assessmentMode": "ImageDefault"
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer":     "WindowsServer",
+            "sku":       "2022-datacenter-azure-edition",
+            "version":   "latest"
+          },
+          "osDisk": {
+            "name":         "[concat(parameters('virtualMachines_vm_sql01_name'), '-osdisk')]",
+            "createOption": "FromImage",
+            "managedDisk":  { "storageAccountType": "Premium_LRS" },
+            "diskSizeGB":   128
+          },
+          "dataDisks": []
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_vm_sql01VMNic_name'))]",
+              "properties": { "primary": true }
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": { "enabled": true }
+        }
+      }
+    },
+
+    {
+      "comments": "=== ALERTA CPU vm-sql01 — CPU > 80% durante 1 min → SmartDetect AG ===",
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[concat('alert-cpu-', parameters('virtualMachines_vm_sql01_name'))]",
+      "location": "global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_vm_sql01_name'))]",
+        "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Application_Insights_Smart_Detection_name'))]"
+      ],
+      "properties": {
+        "description": "Alerta cuando la CPU de vm-sql01 supera el 80% durante 1 minuto",
+        "severity": 2,
+        "enabled": true,
+        "scopes": [
+          "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_vm_sql01_name'))]"
+        ],
+        "evaluationFrequency": "PT1M",
+        "windowSize": "PT1M",
+        "criteria": {
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria",
+          "allOf": [
+            {
+              "name": "cpu-over-80",
+              "criterionType": "StaticThresholdCriterion",
+              "metricNamespace": "Microsoft.Compute/virtualMachines",
+              "metricName": "Percentage CPU",
+              "operator": "GreaterThan",
+              "threshold": 80,
+              "timeAggregation": "Average"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Application_Insights_Smart_Detection_name'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "comments": "=== APP SERVICE ===",
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('appServiceName')]",
+      "location": "[variables('location')]",
+      "identity": { "type": "SystemAssigned" },
+      "kind": "app,linux",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_asp_daniellab_name'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_asp_daniellab_name'))]",
+        "reserved": true,
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "DOTNETCORE|8.0",
+          "alwaysOn": false,
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "http20Enabled": true
+        }
+      }
+    }
+
+  ]
+}
