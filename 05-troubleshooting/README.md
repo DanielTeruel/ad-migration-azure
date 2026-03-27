@@ -1,4 +1,4 @@
-# 🔍 Troubleshooting & Lessons Learned: On-Prem to Azure
+# 🔍 Troubleshooting & Lessons Learned
 
 This repository serves as a technical log and Knowledge Base (KB) of the challenges encountered during the **On-Premise to Azure** migration. It documents the resolution of critical errors across Identity, Databases, App Services, and Infrastructure as Code (IaC).
 
