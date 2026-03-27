@@ -62,7 +62,7 @@ Bicep CLI confirmed installed and up to date.
 az bicep decompile --file template.json
 ```
 
-The decompiler converts `template.json` into `main.bicep` automatically. The process generates warnings for:
+The decompiler converts `template.json` into `template.bicep` automatically. The process generates warnings for:
 - Unused parameters
 - Resources that could not be fully typed
 - Expressions that required manual review
@@ -75,7 +75,7 @@ These warnings do not block deployment but indicate areas where the Bicep file c
 
 ![Bicep File Created](./screenshots/03_bicep_file_created.png)
 
-The generated `main.bicep` contains all resource definitions from the original ARM template translated into Bicep syntax. Key differences from ARM JSON:
+The generated `template.bicep` contains all resource definitions from the original ARM template translated into Bicep syntax. Key differences from ARM JSON:
 
 - No `"$schema"` or `"contentVersion"` headers required
 - Resource declarations use `resource` keyword instead of nested JSON
