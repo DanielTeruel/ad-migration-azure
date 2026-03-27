@@ -1,3 +1,5 @@
+![IAC](./screenshots/banner.png)
+
 # 04-iac — Infraestructura como Código
 
 ## Visión general
