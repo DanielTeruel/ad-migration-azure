@@ -273,6 +273,26 @@ Portfolio successfully deployed and serving dynamic content from SQL Server:
 
 ---
 
+## Step 12 — GitHub Actions History
+
+![GitHub Actions History](./screenshots/12_github_actions_history.png)
+
+Full pipeline run history showing the real iteration process — first failures, fixes and final success. This is the expected workflow when setting up CI/CD for the first time:
+
+| Run | Commit | Result |
+|---|---|---|
+| #1 | ci: add GitHub Actions deploy workflow | ❌ Wrong publish profile |
+| #2 | fix: correct app service name and update action versions | ✅ |
+| #3 | Update Program.cs | ❌ Container timeout |
+| #4 | Update appsettings.json | ❌ Container timeout |
+| #5 | ci: redeploy to new app service | ✅ |
+| #6 | Update Program.cs | ✅ Lazy SQL connection |
+| #7 | fix: remove unused Azure KeyVault packages | ✅ |
+| #8 | fix: downgrade SqlClient to 5.2.2 for Linux compatibility | ✅ |
+| #9 | docs: add README with CI/CD architecture and setup | ✅ |
+
+---
+
 ## Issues & Fixes
 
 | Issue | Cause | Fix |
