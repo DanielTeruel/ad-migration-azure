@@ -2,7 +2,7 @@
 
 ## Overview
 
-APP01 is the application server of the **daniel.local** domain, running **Windows Server 2019** with 2GB RAM on VMware Workstation Pro 17. It hosts the web application, database and backup services for the lab environment.
+APP01 is the application server of the **daniel.local** domain, running **Windows Server 2019** with 2GB RAM on VMware Workstation Pro 17. It hosts the web application, database, and backup services for the lab environment.
 
 ## Server Roles
 
@@ -28,7 +28,7 @@ IIS serves the personal portfolio web application over **HTTPS on port 443**. Po
 | Physical Path | C:\inetpub\wwwroot |
 | Port 80 | Closed |
 
-**Migration target:** Azure App Service (F1 Free)
+**Migration target:** Azure App Service (B1)
 
 ## Web Application — ASP.NET Core 8
 
@@ -36,6 +36,7 @@ IIS serves the personal portfolio web application over **HTTPS on port 443**. Po
 ![.NET Version](./screenshots/app01-dotnet-version.png)
 
 The web application is built on **ASP.NET Core 8**, connecting IIS to SQL Server Express through a 3-tier architecture. The application dynamically renders portfolio content (projects and certifications) from the database instead of hardcoding it in HTML.
+
 ```
 User / WS001
     │
@@ -51,7 +52,7 @@ User / WS001
 **Why ASP.NET Core instead of static HTML?**
 A static HTML page cannot demonstrate a realistic migration scenario. By adding a backend connected to SQL Server, the application becomes a genuine 3-tier workload — the same architecture found in enterprise environments — making the migration to Azure App Service + Azure VM SQL Server meaningful and defensible in an interview.
 
-**Migration target:** Azure App Service (F1 Free)
+**Migration target:** Azure App Service (B1)
 
 ## Database — SQL Server Express
 
@@ -80,7 +81,10 @@ A static HTML page cannot demonstrate a realistic migration scenario. By adding 
 **Why SQL Server Express and not Azure SQL Database directly?**
 Running SQL Server on-premises simulates a realistic lift & shift scenario. Migrating the database to an Azure VM with SQL Server (IaaS) demonstrates the decision-making process between IaaS and PaaS approaches — a key topic in enterprise migrations and Azure administrator interviews.
 
-**Migration target:** Azure VM B2s + SQL Server Developer 2022
+**Why JSON export instead of .bak for the migration?**
+SQL Server 2025 Express (APP01) is not compatible with a restore to SQL Server 2022 (Azure VM) — backup files are not portable downward across versions. JSON export/import is version-agnostic and sufficient for a lab migration. In production, the right tools would be BACPAC or Azure Database Migration Service.
+
+**Migration target:** Azure VM D2s_v3 + SQL Server Developer 2022
 
 ## Windows Server Backup
 
@@ -108,6 +112,7 @@ Windows Server Backup (wbadmin) is configured to back up all application compone
 | Last job result | HResult = 0 ✅ |
 
 ### Backup Path on DC01
+
 ```
 E:\SharedFiles\
 └─ Backups\
@@ -118,9 +123,9 @@ E:\SharedFiles\
 ```
 
 **Why exclude System State?**
-The goal is a lightweight application backup — web files, code and database. A full System State backup would include the entire Windows OS configuration, significantly increasing backup size and time without adding value for this specific recovery scenario.
+The goal is a lightweight application backup — web files, code, and database. A full System State backup would include the entire Windows OS configuration, significantly increasing backup size and time without adding value for this specific recovery scenario.
 
-**Migration target:** Recovery Services Vault + MARS Agent
+**Migration target:** Recovery Services Vault (Azure Backup for SQL Server)
 
 ## Running Services
 
@@ -135,6 +140,6 @@ The goal is a lightweight application backup — web files, code and database. A
 
 | Service | Migration Tool | Azure Service |
 |---|---|---|
-| IIS + ASP.NET | ZIP Deploy | App Service (F1 Free) |
-| SQL Server Express | Backup/Restore .bak | Azure VM B2s + SQL Server |
-| Windows Server Backup | MARS Agent | Recovery Services Vault |
+| IIS + ASP.NET | ZIP Deploy → GitHub Actions (CI/CD) | App Service (B1) |
+| SQL Server Express | JSON export/import | Azure VM D2s_v3 + SQL Server 2022 |
+| Windows Server Backup | Azure Backup | Recovery Services Vault |
