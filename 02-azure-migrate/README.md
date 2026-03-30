@@ -3,16 +3,17 @@
 ![Servers](https://img.shields.io/badge/Servers%20Onboarded-2-blue)
 ![Arc](https://img.shields.io/badge/Azure%20Arc-Enabled-0078D4)
 ![Hybrid Join](https://img.shields.io/badge/Hybrid%20Join-Complete-green)
+![Intune](https://img.shields.io/badge/Intune-Enrolled-green)
 
 # 02 — Azure Migrate & Hybrid Onboarding
 
 ## Overview
 
-This phase covers the **hybrid onboarding** of the on-premises environment into Azure without a full lift-and-shift migration. Rather than replicating VMs to Azure IaaS, the chosen approach uses **Azure Arc** to project on-premises servers into Azure Resource Manager — enabling unified management, policy enforcement, update management and security posture from the Azure Portal.
+This phase covers the **hybrid onboarding** of the on-premises environment into Azure without a full lift-and-shift migration. Rather than replicating VMs to Azure IaaS, the chosen approach uses **Azure Arc** to project on-premises servers into Azure Resource Manager — enabling unified management, policy enforcement, update management, and security posture from the Azure Portal.
 
-Both **DC01** and **APP01** remain running on-premises (VMware Workstation Pro 17) and are registered as Arc-enabled servers. **WS001** completes Hybrid Azure AD Join, bridging on-premises Group Policy with Entra ID conditional access.
+Both **DC01** and **APP01** remain running on-premises (VMware Workstation Pro 17) and are registered as Arc-enabled servers. **WS001** completes Hybrid Azure AD Join and Intune enrollment, bridging on-premises Group Policy with cloud-based device management.
 
-## Approach: Why Arc instead of full VM migration?
+## Design Decision: Why Arc instead of full VM migration?
 
 | Criteria | Azure VM Migration | Azure Arc (chosen) |
 |---|---|---|
@@ -25,18 +26,104 @@ Both **DC01** and **APP01** remain running on-premises (VMware Workstation Pro 1
 
 The SQL Server workload and the web application are migrated separately as PaaS/IaaS resources in `03-azure`. Arc handles the **management plane** while the on-prem servers continue running.
 
-## Servers Onboarded via Azure Arc
+**Why no formal Azure Migrate Assessment?**
+Azure Migrate Assessment is the right tool for production migrations — it provides discovery, dependency mapping, and TCO analysis. For this lab, the migration scope and targets were already defined, making a formal assessment unnecessary. The Arc-first approach was chosen to demonstrate hybrid management rather than a one-way move to the cloud.
 
-| Server | OS | Arc Status | Extensions |
-|---|---|---|---|
-| DC01 | Windows Server 2019 | Connected | MMA · Defender · Policy |
-| APP01 | Windows Server 2019 | Connected | MMA · Defender · Policy |
+---
 
-## Hybrid Join
+## Arc-Enabled Servers
 
-| Machine | Type | Status |
+![Arc Servers Portal](./01-arc/screenshots/arc-servers-portal.png)
+
+| Server | OS | Arc Status |
 |---|---|---|
-| WS001 | Windows 10 | Hybrid Azure AD Joined |
+| DC01 | Windows Server 2019 | Connected ✅ |
+| APP01 | Windows Server 2019 | Connected ✅ |
+
+Both servers were onboarded by generating a registration script from the Azure Portal and executing it locally on each machine. Once connected, both servers appear in Azure Resource Manager and are visible in the Arc — Servers blade.
+
+---
+
+## Azure Update Manager
+
+![Update Manager Dashboard](./02-update-manager/screenshots/update-manager-dashboard-final-with%201%20update-left.png)
+
+Azure Update Manager replaces WSUS as the patch management solution for DC01 and APP01 once they are Arc-enabled.
+
+| Server | Assessment | Patch Cycle | Status |
+|---|---|---|---|
+| DC01 | Periodic (enabled) | One-time update run | No pending updates 🟢 |
+| APP01 | Periodic (enabled) | Assessed | No pending updates 🟢 |
+
+---
+
+## Hybrid Azure AD Join — WS001
+
+![Hybrid Join Success](./03-hybrid-join/screenshots/hybrid-join-dsregcmd-status-success.png)
+![Hybrid Join Portal](./03-hybrid-join/screenshots/hybrid-join-portal-verified.png)
+
+WS001 is joined to both **daniel.local** (on-premises) and **Entra ID** (cloud), enabling a hybrid identity managed from a single device.
+
+| Setting | Value |
+|---|---|
+| AzureAdJoined | YES ✅ |
+| DomainJoined | YES ✅ |
+| DeviceAuthStatus | SUCCESS ✅ |
+
+**How it works:** Entra Connect establishes a Service Connection Point (SCP) in AD DS. When WS001 authenticates against the domain, it automatically registers with Entra ID — no manual enrollment steps required on the device.
+
+---
+
+## Azure Bastion
+
+![Bastion Created](./04-bastion/screenshots/bastion-created.png)
+
+Azure Bastion provides browser-based RDP access to Azure VMs without exposing a public IP. Deployed in this phase to enable secure access to **vm-sql01** in subsequent phases.
+
+| Setting | Value |
+|---|---|
+| SKU | Developer |
+| Subnet | AzureBastionSubnet (10.0.2.0/26) |
+| Resource | bastion-daniellab |
+| Public IP | Assigned |
+
+**Why Bastion here and not in the networking phase?**
+Without an active VM to connect to, deploying Bastion in Phase 2 would incur unnecessary cost. It is deployed alongside the first VM that requires remote access — vm-sql01 in Phase 5.
+
+---
+
+## Intune — Modern Device Management
+
+![Intune Enrolled](./05-intune/screenshots/05_intune_devices_ws001_enrolled.png)
+![Intune Compliant](./05-intune/screenshots/10_intune_device_ws001_compliant.png)
+
+WS001 is enrolled in Microsoft Intune via automatic MDM enrollment triggered by GPO, enabling cloud-based device management alongside on-premises Group Policy.
+
+### Compliance Policy
+
+| Requirement | Status |
+|---|---|
+| Firewall enabled | ✅ |
+| Antivirus enabled | ✅ |
+| Minimum OS build (19045) | ✅ |
+| Overall compliance | Compliant 🟢 |
+
+### Microsoft 365 Apps Deployment
+
+Word, Excel, PowerPoint, and Teams deployed to WS001 via Intune app policy — no manual installation required on the device.
+
+| App | Status |
+|---|---|
+| Microsoft Word | Installed ✅ |
+| Microsoft Excel | Installed ✅ |
+| Microsoft PowerPoint | Installed ✅ |
+| Microsoft Teams | Installed ✅ |
+
+### Endpoint Security
+
+An Interactive Logon Message (legal notice) is enforced on WS001 via an Intune endpoint security policy, displayed at login before the user session starts.
+
+---
 
 ## What This Phase Enables
 
@@ -44,58 +131,13 @@ The SQL Server workload and the web application are migrated separately as PaaS/
 |---|---|---|
 | Unified server inventory | Azure Arc | Manual asset tracking |
 | Patch management | Azure Update Manager | WSUS on DC01 |
-| Security posture | Defender for Cloud | — |
 | Policy enforcement | Azure Policy (via Arc) | GPO (partial) |
 | Identity bridge | Hybrid Azure AD Join | Domain-only identity |
-| Remote access | Azure Bastion | RDP direct exposure |
+| Device management | Microsoft Intune | On-prem GPO only |
+| App deployment | Intune app policy | Manual installation |
+| Remote access | Azure Bastion | Direct RDP exposure |
 
-## Phase Steps
-
-| Step | Description |
-|---|---|
-| 1 | Arc onboarding script generated and executed on DC01 |
-| 2 | Arc onboarding script generated and executed on APP01 |
-| 3 | Arc connectivity verified in Azure Portal |
-| 4 | Azure Update Manager — assessment and patch cycle on both servers |
-| 5 | WS001 Hybrid Azure AD Join configured via GPO |
-| 6 | Hybrid Join verified in Entra ID device list |
-| 7 | Azure Bastion deployed and connectivity tested to vm-sql01 |
-| 8 | Update Manager dashboard reviewed post-patching |
-
-## Screenshots
-
-| File | Description |
-|---|---|
-| arc-script-download.png | Arc onboarding script downloaded from Azure Portal |
-| arc-app01-install.png | Arc agent installation running on APP01 |
-| arc-dc01-install.png | Arc agent installation running on DC01 |
-| arc-app01-completed.png | APP01 showing as Connected in Arc |
-| arc-dc01-completed.png | DC01 showing as Connected in Arc |
-| arc-servers-portal.png | Both servers visible in Azure Arc — Servers blade |
-| arc-onboard-config.png | Arc onboarding configuration options |
-| arc-onboard-tags.png | Tags applied during Arc onboarding |
-| arc-portal-start.png | Azure Arc portal entry point |
-| arc-app01-instll.png | Arc agent install detail on APP01 |
-| hybrid-join-status-success.png | WS001 Hybrid Join status — success |
-| hybrid-join-ou-filter.png | OU filter configuration for Hybrid Join sync |
-| hybrid-join-portal-dev.png | WS001 visible in Entra ID devices |
-| hybrid-join-portal-verified.png | Device compliance verified in portal |
-| hybrid-join-gpo-config.png | GPO settings for Hybrid Azure AD Join |
-| hybrid-join-gpo-linked.png | GPO linked to Workstations OU |
-| hybrid-join-ready-to-configure.png | Pre-join readiness check |
-| hybrid-join-os-selection.png | OS selection during join wizard |
-| hybrid-join-scp-config.png | SCP (Service Connection Point) configuration |
-| hybrid-join-all-assignments.png | All policy assignments post-join |
-| bastion-created.png | Azure Bastion resource created |
-| bastion-pip.png | Public IP associated to Bastion |
-| bastion-subnet-created.png | AzureBastionSubnet created in VNet |
-| bastion-portal-verified.png | Bastion connectivity test to vm-sql01 |
-| update-manager-dc01-updates-selected.png | Updates selected for DC01 |
-| update-manager-dc01-onetime-start.png | One-time update run initiated on DC01 |
-| update-manager-dc01-install-confirmed.png | DC01 patch installation confirmed |
-| update-manager-dc01-dashboard-final.png | Update Manager dashboard post-patching |
-| update-manager-dc01-updates-after.png | DC01 update status after patching |
-| update-manager-manager-over-view.png | Update Manager overview — all machines |
+---
 
 ## Status
 
@@ -104,4 +146,6 @@ The SQL Server workload and the web application are migrated separately as PaaS/
 - [x] Azure Update Manager — patch cycle completed on both servers
 - [x] WS001 — Hybrid Azure AD Join completed
 - [x] Azure Bastion — deployed and verified
-- [ ] Azure Migrate Assessment (formal) — not performed (Arc-first approach chosen)
+- [x] WS001 — Intune enrolled and compliant
+- [x] Microsoft 365 Apps — deployed via Intune
+- [x] Endpoint security policy — applied
