@@ -44,7 +44,7 @@ This environment serves as the migration source for the Azure phase of the lab.
 | Departamentos/General | user4_general | ✅ |
 | Grupos | Sec_Admins · Sec_HR · Sec_IT | ✅ |
 | Servers | APP01 | ❌ (computers excluded) |
-| Workstations | WS001 | ❌ (computers excluded) |
+| Workstations | WS001 | ✅ |
 | Admin_NoSync | user3_admin · App01Admin | ❌ (privileged accounts) |
 | Service_Accounts | — | ❌ (reserved) |
 
