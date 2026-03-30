@@ -2,9 +2,11 @@
 
 ## Overview
 
-This phase implements a full CI/CD pipeline using GitHub Actions to automatically deploy a .NET 8 portfolio web application to Azure App Service on every `git push` to `main`.
+This section implements a full CI/CD pipeline using **GitHub Actions** to automatically deploy the ASP.NET Core 8 portfolio web application to Azure App Service on every `git push` to `main`.
 
-The application connects to a SQL Server 2025 Express instance running on an Azure VM within the same VNet, retrieving project and certification data to render the portfolio dynamically.
+This is the final piece of the IaC phase — infrastructure is provisioned by Bicep, and the application is deployed and kept up to date by the pipeline. No manual portal interaction after initial setup.
+
+> **Context:** This phase uses a fresh environment provisioned by the Bicep template (`04-iac/bicep/`), which is why resource names include a deployment suffix (e.g. `app-daniellab-2603`). The SQL VM in this phase runs **SQL Server 2025 Express** — reinstalled to match the original on-premises version after a version incompatibility with the `.bak` restore format from SQL 2022.
 
 ## Architecture
 
@@ -19,15 +21,15 @@ GitHub Repository
     ▼
 Build & Publish (.NET 8)
     │
-    │  Deploy ZIP via Publish Profile
+    │  Deploy via Publish Profile
     ▼
-Azure App Service (Linux)
+Azure App Service (Linux · B1)
     │
-    │  VNet Integration (snet-appservice)
+    │  VNet Integration (snet-appservice · 10.0.3.0/24)
     ▼
-VM vm-sql01 — SQL Server 2025 Express
+vm-sql01 — SQL Server 2025 Express (10.0.1.10)
     │
-    │  TCP 1433
+    │  TCP 1433 (private IP — never public)
     ▼
 DanielDB (Proyectos + Certificaciones)
 ```
@@ -36,16 +38,18 @@ DanielDB (Proyectos + Certificaciones)
 
 | Component | Technology |
 |---|---|
-| Web App | ASP.NET Core 8 Minimal API |
+| Web application | ASP.NET Core 8 |
 | Database | SQL Server 2025 Express on Azure VM |
-| Hosting | Azure App Service (Linux, .NET 8) |
+| Hosting | Azure App Service (Linux, B1) |
 | CI/CD | GitHub Actions |
 | Networking | Azure VNet Integration |
-| Secrets | App Service Connection Strings |
+| Secrets | App Service Connection String |
 
 ---
 
-## Step 1 — Push Code to GitHub
+## Steps
+
+### 1 — Push code to GitHub
 
 ![Git Push Portfolio](./screenshots/01_git_push_portfolio.png)
 
@@ -58,11 +62,9 @@ git remote add origin https://github.com/DanielTeruel/daniel-portfolio-web.git
 git push -u origin main
 ```
 
-Public repository created at `github.com/DanielTeruel/daniel-portfolio-web`. No secrets or credentials in the codebase — connection string is read from App Service environment variable `SQLCONNSTR_DanielDB` at runtime.
+No secrets or credentials in the codebase — the connection string is read from the App Service environment variable `SQLCONNSTR_DanielDB` at runtime.
 
----
-
-## Step 2 — Obtain Publish Profile
+### 2 — Obtain Publish Profile
 
 ![Publish Profile Output](./screenshots/02_publish_profile_output.png)
 
@@ -73,11 +75,9 @@ az webapp deployment list-publishing-profiles `
   --xml
 ```
 
-The XML output contains the deployment credentials for the App Service. This is used by GitHub Actions to authenticate and deploy the application.
+The XML output contains the deployment credentials used by GitHub Actions to authenticate against the App Service.
 
----
-
-## Step 3 — Configure GitHub Secret
+### 3 — Configure GitHub Secret
 
 ![GitHub Secret Created](./screenshots/03_github_secret_created.png)
 
@@ -88,23 +88,19 @@ Name:  AZURE_WEBAPP_PUBLISH_PROFILE
 Value: <XML from previous step>
 ```
 
-The XML value is masked in the screenshot for security. The secret name must match exactly what is referenced in the workflow file.
+The secret name must match exactly what is referenced in the workflow file.
 
----
-
-## Step 4 — VNet Integration
+### 4 — VNet Integration
 
 ![VNet Integration](./screenshots/04_vnet_integration.png)
 
 ```powershell
-# Create dedicated subnet for App Service
 az network vnet subnet create `
   --resource-group rg-daniellab-v3 `
   --vnet-name vnet-daniellab-2603 `
   --name snet-appservice `
   --address-prefix 10.0.3.0/24
 
-# Integrate App Service with VNet
 az webapp vnet-integration add `
   --name app-daniellab-2603 `
   --resource-group rg-daniellab-v3 `
@@ -112,43 +108,15 @@ az webapp vnet-integration add `
   --subnet snet-appservice
 ```
 
-A dedicated subnet (`snet-appservice 10.0.3.0/24`) was created for the App Service — it cannot share the same subnet as the VM. VNet Integration allows the App Service to reach the VM's private IP (`10.0.1.10`) over port 1433.
+A dedicated subnet is required — App Service VNet Integration cannot share the subnet used by the VM. This allows the App Service to reach the VM's private IP (`10.0.1.10`) over port 1433 without any public exposure.
 
----
-
-## Step 5 — SQL Server 2025 on VM
+### 5 — SQL Server 2025 on VM
 
 ![SQL Installed](./screenshots/05_sql_installed.png)
 
-```powershell
-# Download SQL Server 2025 Express
-Invoke-WebRequest `
-  -Uri "https://download.microsoft.com/download/7ab8f535-7eb8-4b16-82eb-eca0fa2d38f3/SQL2025-SSEI-Expr.exe" `
-  -OutFile "C:\sql2025.exe"
+SQL Server 2025 Express reinstalled on `vm-sql01` to resolve a `.bak` format incompatibility — the backup generated from the on-premises SQL 2025 instance could not be restored to SQL 2022 Developer (used in Phase 5). Mixed Mode authentication and fixed port 1433 configured.
 
-C:\sql2025.exe /ACTION=Download /MEDIAPATH=C:\SQLMedia2025 /MEDIATYPE=Core /QUIET
-
-C:\SQLMedia2025\SQLEXPR_x64_ENU.exe /ACTION=Install `
-  /FEATURES=SQLEngine `
-  /INSTANCENAME=MSSQLSERVER `
-  /SQLSYSADMINACCOUNTS="BUILTIN\Administrators" `
-  /TCPENABLED=1 `
-  /NPENABLED=1 `
-  /IACCEPTSQLSERVERLICENSETERMS `
-  /QUIET
-
-# Enable fixed port 1433
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQLServer\SuperSocketNetLib\Tcp\IPAll" -Name "TcpPort" -Value "1433"
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQLServer\SuperSocketNetLib\Tcp\IPAll" -Name "TcpDynamicPorts" -Value ""
-
-Restart-Service -Name "MSSQL`$SQLEXPRESS" -Force
-```
-
-SQL Server 2025 Express (v17.0.1000.7) installed on the VM. Mixed Mode authentication enabled during installation to allow SQL login from the App Service. Port 1433 fixed (SQLEXPRESS uses dynamic ports by default).
-
----
-
-## Step 6 — GitHub Actions Workflow
+### 6 — GitHub Actions Workflow
 
 ![Workflow Updated](./screenshots/06_workflow_yml_updated.png)
 
@@ -186,52 +154,11 @@ jobs:
           package: ./publish
 ```
 
-The workflow builds and publishes the .NET app on a Linux runner, then deploys the output ZIP to the App Service using the Publish Profile secret.
-
----
-
-## Step 7 — Git Push Fix
-
-![Git Push Fix](./screenshots/07_git_push_fix.png)
-
-```powershell
-git add .
-git commit -m "fix: correct app service name and update action versions"
-git push
-```
-
-Initial deployment failed due to incorrect App Service name in the workflow (`app-daniellab` instead of `app-daniellab-2603`). Fixed by updating the `app-name` field and upgrading action versions to Node.js 24 compatible releases.
-
----
-
-## Step 8 — Database Restored
-
-![DanielDB Restored](./screenshots/08_danieldb_restored.png)
-
-```powershell
-# Upload BAK to Storage Account (from local PC)
-$ctx = New-AzStorageContext -StorageAccountName "stbkp2603qprhr" -StorageAccountKey $storageKey
-Set-AzStorageBlobContent -File "C:\Users\estudio\Desktop\DanielDB.bak" -Container "backups" -Blob "DanielDB.bak" -Context $ctx
-
-# Download BAK on VM and restore
-sqlcmd -S ".\SQLEXPRESS" -C -Q "
-RESTORE DATABASE DanielDB
-FROM DISK = 'C:\SQLBackups\DanielDB.bak'
-WITH MOVE 'DanielDB' TO 'C:\Program Files\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQL\DATA\DanielDB.mdf',
-     MOVE 'DanielDB_log' TO 'C:\Program Files\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQL\DATA\DanielDB_log.ldf',
-     REPLACE, STATS=10
-"
-```
-
-`DanielDB.bak` (SQL Server 2025 format) uploaded to Azure Blob Storage, downloaded to the VM via SAS URL, and restored successfully. Database contains tables `Proyectos` and `Certificaciones` with portfolio data.
-
----
-
-## Step 9 — GitHub Actions Success
+### 7 — Pipeline Success
 
 ![GitHub Actions Success](./screenshots/09_github_actions_success.png)
 
-Pipeline running end-to-end in under 2 minutes:
+Pipeline running end-to-end in under 3 minutes:
 
 | Stage | Duration |
 |---|---|
@@ -242,46 +169,25 @@ Pipeline running end-to-end in under 2 minutes:
 | Deploy | ~60s |
 | **Total** | **~2 min** |
 
----
-
-## Step 10 — Connection String
-
-![App Service Connection String](./screenshots/10_appservice_connection_string.png)
-
-```powershell
-az webapp config connection-string set `
-  --name app-daniellab-2603 `
-  --resource-group rg-daniellab-v3 `
-  --connection-string-type SQLServer `
-  --settings "DanielDB=Server=10.0.1.10\SQLEXPRESS,1433;Database=DanielDB;User Id=sqladmin;Password=***;TrustServerCertificate=True;"
-```
-
-Connection string stored as App Service Connection String (type: SQLServer). Azure automatically exposes it as environment variable `SQLCONNSTR_DanielDB`, read in `Program.cs` at runtime.
-
----
-
-## Step 11 — Portfolio Live
+### 8 — Portfolio Live
 
 ![Webpage Projects](./screenshots/11_webpage_projects.png)
-![Webpage Functional](./screenshots/webpage%20functional.png)
-
-Portfolio successfully deployed and serving dynamic content from SQL Server:
 
 - **URL:** https://app-daniellab-2603.azurewebsites.net
-- **Runtime:** DOTNETCORE 8.0.23
-- **Data source:** DanielDB via VNet (private IP 10.0.1.10)
+- **Runtime:** DOTNETCORE 8.0
+- **Data source:** DanielDB via VNet Integration (private IP 10.0.1.10)
 
 ---
 
-## Step 12 — GitHub Actions History
+## Pipeline Run History
 
 ![GitHub Actions History](./screenshots/12_github_actions_history.png)
 
-Full pipeline run history showing the real iteration process — first failures, fixes and final success. This is the expected workflow when setting up CI/CD for the first time:
+The full run history shows the real iteration process — initial failures, fixes, and final stable state. This is the expected workflow when setting up CI/CD for the first time.
 
 | Run | Commit | Result |
 |---|---|---|
-| #1 | ci: add GitHub Actions deploy workflow | ❌ Wrong publish profile |
+| #1 | ci: add GitHub Actions deploy workflow | ❌ Wrong app-name |
 | #2 | fix: correct app service name and update action versions | ✅ |
 | #3 | Update Program.cs | ❌ Container timeout |
 | #4 | Update appsettings.json | ❌ Container timeout |
@@ -289,7 +195,7 @@ Full pipeline run history showing the real iteration process — first failures,
 | #6 | Update Program.cs | ✅ Lazy SQL connection |
 | #7 | fix: remove unused Azure KeyVault packages | ✅ |
 | #8 | fix: downgrade SqlClient to 5.2.2 for Linux compatibility | ✅ |
-| #9 | docs: add README with CI/CD architecture and setup | ✅ |
+| #9 | docs: add README | ✅ |
 
 ---
 
@@ -301,18 +207,23 @@ Full pipeline run history showing the real iteration process — first failures,
 | Container timeout on startup | SQL connection blocking app startup | Moved connection inside endpoint handler (lazy init) |
 | SQL login failed | `sqladmin` existed only as Windows login | Created SQL login with password + db_owner role |
 | SQLEXPRESS dynamic port | Express uses random port by default | Fixed port to 1433 via registry + service restart |
-| BAK incompatible (v998 vs v957) | BAK from SQL 2025, VM had SQL 2022 | Reinstalled SQL 2025 Express on VM |
-| SqlClient crash on Linux | v6.x incompatible with some Linux configs | Downgraded to v5.2.2 |
+| BAK incompatible (SQL 2025 → 2022) | BAK format version mismatch | Reinstalled SQL 2025 Express on VM |
+| SqlClient crash on Linux | v6.x incompatible with Linux App Service | Downgraded to v5.2.2 |
+
+Full details in [05-troubleshooting/docs/06-cicd-errors.md](../../05-troubleshooting/docs/06-cicd-errors.md).
 
 ---
 
 ## Key Decisions
 
-**Why env var instead of Key Vault?**
-For lab/demo purposes the connection string is stored directly as an App Service Connection String. In production, Key Vault with Managed Identity would be the correct approach — the infrastructure already has both Key Vault and Managed Identity configured in the Bicep template.
+**Why App Service Connection String instead of Key Vault?**
+The connection string is stored as an App Service Connection String and exposed as `SQLCONNSTR_DanielDB` at runtime. The Bicep template already provisions Key Vault and Managed Identity — in production, that would be the correct path. For this lab, the connection string approach was chosen to isolate CI/CD troubleshooting from identity troubleshooting.
 
-**Why SQL Server on VM instead of Azure SQL?**
-Cost optimization for lab environment. Azure SQL Database would be the production-ready alternative with built-in HA, backups and no VM management overhead.
+**Why lazy SQL connection?**
+The SQL connection is opened inside the endpoint handler rather than at startup. This prevents container timeout during cold starts on the Linux B1 plan — the app starts and passes the health check before attempting the database connection.
 
 **Why a dedicated subnet for App Service?**
-Azure VNet Integration requires a delegated subnet exclusively for the App Service — it cannot share the subnet with other resources like the VM.
+Azure VNet Integration requires a subnet delegated exclusively to the App Service. It cannot share the subnet used by the VM.
+
+**Why reinstall SQL 2025 instead of keeping SQL 2022?**
+The original on-premises instance ran SQL 2025 Express. The `.bak` backup format is not backward compatible — a SQL 2025 backup cannot be restored to SQL 2022. Rather than re-exporting via JSON again, SQL 2025 was reinstalled on the VM to keep the restore path clean.
