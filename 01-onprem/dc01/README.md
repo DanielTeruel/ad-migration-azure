@@ -19,6 +19,7 @@ DC01 is the primary Domain Controller of the **daniel.local** domain, running **
 ![AD OU Structure](./screenshots/dc01-ad-ou-structure.png)
 
 The domain **daniel.local** is organized under a dedicated OU called **DANIEL**, following enterprise best practices for Entra Connect synchronization scope.
+
 ```
 DANIEL (root OU)
 ├─ Departamentos
@@ -120,15 +121,21 @@ Applied to **OU=Servers**. Configures APP01 to receive updates from WSUS with ad
 | TargetGroup | Servers |
 
 **Why different GPOs for servers and workstations?**
-Servers require controlled maintenance windows — an unplanned restart of APP01 would take down IIS, SQL Server and the web application. Workstations can be patched and restarted automatically without business impact.
+Servers require controlled maintenance windows — an unplanned restart of APP01 would take down IIS, SQL Server, and the web application. Workstations can be patched and restarted automatically without business impact.
 
 ## File Server
 
 ![Backup Folder](./screenshots/dc01-fileserver-backup-folder.png)
+![File Server Shares](./screenshots/dc01-filserver-shares.png)
 
-Shared folder **E:\SharedFiles** serves as the backup destination for APP01's Windows Server Backup job.
+Shared folder **E:\SharedFiles** serves as the backup destination for APP01's Windows Server Backup job and as the central file share for the domain.
+
 ```
 E:\SharedFiles\
+├─ Docs\
+├─ Labs\
+├─ Templates\
+├─ General\
 └─ Backups\
     └─ APP01\
         └─ WindowsImageBackup\
@@ -136,7 +143,7 @@ E:\SharedFiles\
                 └─ Backup YYYY-MM-DD\ (daily)
 ```
 
-**Migration target:** Azure Files (Standard LRS)
+**Migration target:** Azure Files (Standard LRS) — migrated via AzCopy
 
 ## WSUS — Windows Server Update Services
 
@@ -153,7 +160,7 @@ WSUS running on port **8530**, managing updates for all lab machines separated i
 | Servers | app01.daniel.local | GPO-WSUS-Servers |
 | Workstations | ws001.daniel.local | GPO-WSUS |
 
-**Products configured:** Windows 10, Windows 11, Windows Server 2019
+**Products configured:** Windows 10, Windows 11, Windows Server 2019  
 **Classifications:** Critical Updates, Security Updates
 
 **Migration target:** Azure Update Manager (via Azure Arc)
@@ -163,6 +170,6 @@ WSUS running on port **8530**, managing updates for all lab machines separated i
 | Service | Migration Tool | Azure Service |
 |---|---|---|
 | AD DS | Entra Connect | Entra ID |
-| DNS | Included | Entra ID Private DNS |
-| File Server | AzCopy | Azure Files |
+| DNS | Included in Entra Connect | Entra ID Private DNS |
+| File Server | AzCopy | Azure Files (Standard LRS) |
 | WSUS | Azure Arc | Azure Update Manager |
