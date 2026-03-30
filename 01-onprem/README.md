@@ -1,5 +1,4 @@
 ![On-Premises Infrastructure](./banner-onprem.png)
-
 ![Status](https://img.shields.io/badge/Status-Complete-green)
 ![VMs](https://img.shields.io/badge/VMs-3-blue)
 ![Hypervisor](https://img.shields.io/badge/Hypervisor-VMware%20Workstation%20Pro%2017-lightgrey)
@@ -9,7 +8,7 @@
 
 ## Overview
 
-Complete on-premises infrastructure built on **VMware Workstation Pro 17**, simulating a real enterprise environment with a Domain Controller, an Application Server and a Windows 10 client machine — all joined to the **daniel.local** domain.
+Complete on-premises infrastructure built on **VMware Workstation Pro 17**, simulating a real enterprise environment with a Domain Controller, an Application Server, and a Windows 10 client machine — all joined to the **daniel.local** domain.
 
 This environment serves as the migration source for the Azure phase of the lab.
 
@@ -28,11 +27,11 @@ This environment serves as the migration source for the Azure phase of the lab.
 | AD DS (daniel.local) | DC01 | Entra ID |
 | DNS | DC01 | Entra ID Private DNS |
 | DHCP | DC01 | — |
-| GPO | DC01 | Azure Policy |
+| GPO | DC01 | Azure Policy + Intune |
 | File Server | DC01 | Azure Files |
 | WSUS | DC01 | Azure Update Manager |
-| IIS + ASP.NET Core 8 | APP01 | App Service (F1 Free) |
-| SQL Server Express | APP01 | Azure VM + SQL Server |
+| IIS + ASP.NET Core 8 | APP01 | App Service (B1) |
+| SQL Server Express | APP01 | Azure VM D2s_v3 + SQL Server 2022 |
 | Windows Server Backup | APP01 | Recovery Services Vault |
 
 ## AD Structure
@@ -60,10 +59,10 @@ This environment serves as the migration source for the Azure phase of the lab.
 ## Security Design Decisions
 
 **Tier Model — Admin_NoSync OU**
-Privileged accounts are isolated from cloud sync following the Tier Model security principle. A cloud compromise cannot be used to attack on-premises privileged accounts.
+Privileged accounts are isolated from cloud sync following the Tier Model security principle. A cloud compromise cannot be used to escalate to on-premises privileged accounts.
 
 **Least Privilege — RBAC mapping**
-AD security groups are mapped to Azure RBAC roles following least privilege — no user has more permissions than strictly necessary.
+AD security groups are mapped to Azure RBAC roles following least privilege — no user has more permissions than strictly necessary for their role.
 
 **Separate GPOs for Servers and Workstations**
 APP01 (OU=Servers) receives GPO-WSUS-Servers with notify-only update behavior and no auto-restart. WS001 (OU=Workstations) receives GPO-WSUS with automatic install. This prevents unplanned service outages on the application server.
@@ -77,11 +76,12 @@ IIS is configured to serve only over HTTPS (port 443). Port 80 is closed to redu
 |---|---|
 | [dc01](./dc01/) | Domain Controller — AD DS, DNS, DHCP, GPO, WSUS, File Server |
 | [app01](./app01/) | Application Server — IIS, ASP.NET Core 8, SQL Server, WSB |
-| [ws001](./ws001/) | Client Machine — Domain Join, GPO, WSUS, resource access |
+| [ws001](./ws001/) | Client Machine — Domain Join, GPO, WSUS, Hybrid Join, Intune |
 
 ## Status
 
 - [x] DC01 — fully configured and documented
 - [x] APP01 — fully configured and documented
 - [x] WS001 — fully configured and documented
-- [ ] Hybrid Azure AD Join (WS001) — pending Azure phase
+- [x] Hybrid Azure AD Join (WS001) — completed in Azure phase
+- [x] Intune enrollment (WS001) — completed in Azure phase
