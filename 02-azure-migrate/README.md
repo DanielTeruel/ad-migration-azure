@@ -46,7 +46,7 @@ Both servers were onboarded by generating a registration script from the Azure P
 
 ## Azure Update Manager
 
-![Update Manager Dashboard](./02-update-manager/screenshots/update-manager-dashboard-final-with%201%20update-left.png)
+![DC01 Completed](./screenshots/update-manager-dc01-completed.png)
 
 Azure Update Manager replaces WSUS as the patch management solution for DC01 and APP01 once they are Arc-enabled.
 
