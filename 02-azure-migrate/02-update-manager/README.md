@@ -58,13 +58,10 @@ Update Manager pushes the installation job to the Arc agent on DC01. The agent a
 ### 3 — Installation Confirmed
 
 ![Install Confirmed](./screenshots/update-manager-dc01-install-confirm.png)
-![DC01 Completed](./screenshots/update-manager-dc01-completed.png)
 
 ### 4 — Post-Patch Status
 
-![Check Updates After](./screenshots/update-manager-check-updates-after.png)
-![Dashboard Final](./screenshots/update-manager-dashboard-final-with%201%20update-left.png)
-![Overview](./screenshots/update-manager-overview.png)
+![DC01 Completed](./screenshots/update-manager-dc01-completed.png)
 
 Post-patching dashboard confirms DC01 compliance status. One update remained pending at time of screenshot due to a reboot requirement — resolved after scheduled restart.
 
