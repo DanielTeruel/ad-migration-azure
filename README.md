@@ -28,9 +28,9 @@ For detailed diagrams and architecture decisions, see [00-architecture](./00-arc
 
 A traditional on-premises Windows Server environment with Active Directory, internal web applications, and file shares needs to migrate all workloads to Azure — maintaining hybrid identity, improving update management, and ensuring backup and disaster recovery in the cloud.
 
-This lab simulates the full migration lifecycle following the **Microsoft Cloud Adoption Framework (CAF)**:
+This lab covers the full migration lifecycle — from on-premises infrastructure design to cloud deployment, governance and automation — structured around the **Microsoft Cloud Adoption Framework (CAF)** phases as a reference model.
 
-| CAF Phase | Content |
+| Phase | Content |
 |---|---|
 | Strategy | Migration justification and goals |
 | Plan | On-premises inventory and migration phases |
